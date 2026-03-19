@@ -49,9 +49,7 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-surface px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <MessageSquare className="h-6 w-6" />
-          </div>
+          <img src={logo} alt="WH-Chat Box" className="mx-auto mb-3 h-16 w-16 rounded-lg object-contain" />
           <h1 className="text-2xl font-semibold text-foreground">Welcome back</h1>
           <p className="mt-1 text-sm text-muted-foreground">Sign in to your Chats account</p>
         </div>

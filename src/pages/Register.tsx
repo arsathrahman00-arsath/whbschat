@@ -6,7 +6,8 @@ import { AvatarUpload } from "@/components/AvatarUpload";
 import { ResponseBanner } from "@/components/ResponseBanner";
 import { getDeviceToken } from "@/lib/firebase";
 import { getDeviceMetadata } from "@/lib/device";
-import { Loader2, MessageSquare } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import logo from "@/assets/logo.jpg";
 
 interface FormData {
   email: string;

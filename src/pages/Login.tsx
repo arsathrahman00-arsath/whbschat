@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/FormField";
 import { ResponseBanner } from "@/components/ResponseBanner";
-import { Loader2, MessageSquare } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import logo from "@/assets/logo.jpg";
 
 export default function Login() {
   const [username, setUsername] = useState("");

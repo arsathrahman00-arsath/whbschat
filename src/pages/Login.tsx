@@ -45,12 +45,13 @@ export default function Login() {
         return;
       }
 
-      // Step 2: Create chat session
+      // Step 2: Create chat session using id and username from login response
       const chatRes = await fetch("https://ngrchatbot.whindia.in/chat/create_chat/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          created_by: username,
+          id: loginData.id,
+          created_by: loginData.username,
         }),
       });
 

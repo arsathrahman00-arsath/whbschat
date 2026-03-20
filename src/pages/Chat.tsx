@@ -72,6 +72,13 @@ export default function Chat() {
       const data = await res.json();
       let userList: ChatUser[] = Array.isArray(data) ? data : data.users || data.results || [];
 
+      // Remove logged-in user from the list
+      if (session?.username) {
+        userList = userList.filter(
+          (u) => u.username.toLowerCase() !== session.username.toLowerCase()
+        );
+      }
+
       // Special case: if logged-in user is "rahmanarsath", show only "mohamed" and "Mohamed illyas"
       if (session?.username === "rahmanarsath") {
         userList = userList.filter(

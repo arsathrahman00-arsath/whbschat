@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/FormField";
 import { ResponseBanner } from "@/components/ResponseBanner";
@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import logo from "@/assets/logo.jpg";
 
 export default function Login() {
+  const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ username?: string; password?: string }>({});
@@ -27,17 +28,53 @@ export default function Login() {
 
     setLoading(true);
     try {
-      const res = await fetch("https://ngrchatbot.whindia.in/chat/user_login/", {
+      // Step 1: Login
+      const loginRes = await fetch("https://ngrchatbot.whindia.in/chat/user_login/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password_hash: password }),
       });
 
-      const data = await res.json();
-      setResponse({
-        message: data.message || data.detail || JSON.stringify(data),
-        type: res.ok ? "success" : "error",
+      const loginData = await loginRes.json();
+
+      if (!loginRes.ok) {
+        setResponse({
+          message: loginData.message || loginData.detail || JSON.stringify(loginData),
+          type: "error",
+        });
+        return;
+      }
+
+      // Step 2: Create chat session
+      const chatRes = await fetch("https://ngrchatbot.whindia.in/chat/create_chat/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          created_by: username,
+        }),
       });
+
+      const chatData = await chatRes.json();
+
+      if (!chatRes.ok) {
+        setResponse({
+          message: chatData.message || chatData.detail || JSON.stringify(chatData),
+          type: "error",
+        });
+        return;
+      }
+
+      // Store session info
+      const session = {
+        userId: chatData.id || loginData.id,
+        username,
+        chatId: chatData.id,
+        created_by: chatData.created_by || username,
+      };
+      sessionStorage.setItem("whchat_session", JSON.stringify(session));
+
+      // Redirect to chat
+      navigate("/chat");
     } catch (err: any) {
       setResponse({ message: err.message || "Network error", type: "error" });
     } finally {
@@ -46,21 +83,21 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <img src={logo} alt="WH-Chat Box" className="mx-auto mb-3 h-16 w-16 rounded-lg object-contain" />
-          <h1 className="text-2xl font-semibold text-foreground">Welcome back</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Sign in to your Chats account</p>
+          <img src={logo} alt="WH-Chat Box" className="mx-auto mb-3 h-16 w-16 rounded-2xl object-contain shadow-md" />
+          <h1 className="text-2xl font-semibold text-gray-900">Welcome back</h1>
+          <p className="mt-1 text-sm text-gray-500">Sign in to your WH-Chat Box account</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="rounded-lg border bg-card p-6 shadow-sm space-y-5">
+        <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_2px_12px_rgba(0,0,0,0.08)] space-y-5">
           {response && <ResponseBanner message={response.message} type={response.type} />}
 
           <FormField
             label="Username"
             name="username"
-            placeholder="johndoe"
+            placeholder="Enter your username"
             value={username}
             onChange={(e) => { setUsername(e.target.value); setErrors((p) => ({ ...p, username: undefined })); }}
             error={errors.username}
@@ -77,13 +114,17 @@ export default function Login() {
             required
           />
 
-          <Button type="submit" className="w-full h-11 font-semibold" disabled={loading}>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full h-11 rounded-xl font-semibold text-white bg-gradient-to-r from-[#1E90FF] to-[#22C55E] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center"
+          >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign In"}
-          </Button>
+          </button>
 
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="text-center text-sm text-gray-500">
             Don't have an account?{" "}
-            <Link to="/register" className="font-medium text-primary hover:underline">
+            <Link to="/register" className="font-medium text-[#1E90FF] hover:underline">
               Create one
             </Link>
           </p>

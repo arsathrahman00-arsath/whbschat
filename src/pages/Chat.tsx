@@ -70,7 +70,7 @@ export default function Chat() {
     try {
       const res = await fetch("https://ngrchatbot.whindia.in/chat/get_users/");
       const data = await res.json();
-      let userList: ChatUser[] = Array.isArray(data) ? data : data.users || data.results || [];
+      let userList: ChatUser[] = Array.isArray(data) ? data : data.data || data.users || data.results || [];
 
       // Remove logged-in user from the list
       if (session?.username) {

@@ -72,24 +72,31 @@ export default function Chat() {
   }, []);
 
   const connectWebSocket = useCallback(() => {
-    if (!currentUserId) return;
+    if (!currentUserId) {
+      console.warn("No currentUserId, skipping WebSocket connection");
+      return;
+    }
     if (wsRef.current) wsRef.current.close();
 
-    const ws = new WebSocket(`${WS_BASE_URL}/${currentUserId}/`);
+    const wsUrl = `${WS_BASE_URL}/${currentUserId}/`;
+    console.log("Connecting WebSocket to:", wsUrl);
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
-    ws.onopen = () => setWsConnected(true);
+    ws.onopen = () => {
+      console.log("WebSocket connected");
+      setWsConnected(true);
+    };
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        console.log("WebSocket message received:", data);
         const senderId = String(data.sender_id);
-        const receiverId = String(data.receiver_id);
         const isFromMe = senderId === String(currentUserId);
         if (isFromMe) return;
 
-        const chatPartnerId = isFromMe ? receiverId : senderId;
-        addMessage(chatPartnerId, {
+        addMessage(senderId, {
           id: `ws-${Date.now()}-${Math.random()}`,
           text: data.message,
           sender: "other",
@@ -101,7 +108,8 @@ export default function Chat() {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
+      console.log("WebSocket closed:", event.code, event.reason);
       setWsConnected(false);
       reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
     };

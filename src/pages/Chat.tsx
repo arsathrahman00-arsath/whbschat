@@ -126,7 +126,7 @@ export default function Chat() {
   const fetchUsers = async () => {
     setLoadingUsers(true);
     try {
-      const res = await fetch("https://ngrchatbot.whindia.in/zkinventory/get_users/");
+      const res = await fetch("https://ngrchatbot.whindia.in/chat/get_users/");
       const data = await res.json();
       const rawList = Array.isArray(data) ? data : data.data || data.users || data.results || [];
       let userList: ChatUser[] = rawList.map((u: any) => ({

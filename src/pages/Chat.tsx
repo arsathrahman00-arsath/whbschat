@@ -153,12 +153,23 @@ export default function Chat() {
   };
 
   const handleSend = () => {
-    if (!input.trim() || !selectedUser || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(JSON.stringify({
+    if (!input.trim() || !selectedUser) return;
+    
+    const msgPayload = {
       sender_id: currentUserId,
       receiver_id: selectedUser.id,
       message: input.trim(),
-    }));
+    };
+
+    // Try sending via WebSocket
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(msgPayload));
+    } else {
+      console.warn("WebSocket not connected, attempting reconnect...");
+      connectWebSocket();
+    }
+
+    // Show message locally regardless
     addMessage(String(selectedUser.id), {
       id: `sent-${Date.now()}`,
       text: input.trim(),

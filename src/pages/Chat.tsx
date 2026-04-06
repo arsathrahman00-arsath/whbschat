@@ -8,6 +8,7 @@ import logo from "@/assets/logo.jpg";
 interface ChatUser {
   id: number | string;
   username: string;
+  user_code?: number;
 }
 
 interface Message {

@@ -302,9 +302,8 @@ export default function Chat() {
             <div className="p-3 md:p-4 border-t border-gray-200 bg-white">
               <div className="flex items-end gap-2">
                 <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                  placeholder={wsConnected ? "Type a message..." : "Connecting..."}
-                  disabled={!wsConnected}
-                  className="flex-1 h-11 px-4 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1E90FF] focus:ring-1 focus:ring-[#1E90FF]/30 transition-colors disabled:opacity-50" />
+                  placeholder="Type a message..."
+                  className="flex-1 h-11 px-4 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1E90FF] focus:ring-1 focus:ring-[#1E90FF]/30 transition-colors" />
                 <button onClick={handleSend} disabled={!input.trim() || !wsConnected}
                   className="h-11 w-11 rounded-xl bg-gradient-to-r from-[#1E90FF] to-[#22C55E] text-white flex items-center justify-center hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none flex-shrink-0">
                   <Send className="h-5 w-5" />

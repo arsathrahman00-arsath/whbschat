@@ -128,7 +128,12 @@ export default function Chat() {
     try {
       const res = await fetch("https://ngrchatbot.whindia.in/zkinventory/get_users/");
       const data = await res.json();
-      let userList: ChatUser[] = Array.isArray(data) ? data : data.data || data.users || data.results || [];
+      const rawList = Array.isArray(data) ? data : data.data || data.users || data.results || [];
+      let userList: ChatUser[] = rawList.map((u: any) => ({
+        id: u.id,
+        username: u.user_name || u.username || u.name || `User ${u.id}`,
+        user_code: u.user_code,
+      }));
       if (currentUserId) userList = userList.filter(u => String(u.id) !== String(currentUserId));
       if (session?.username) userList = userList.filter(u => u.username.toLowerCase() !== session.username.toLowerCase());
       setUsers(userList);

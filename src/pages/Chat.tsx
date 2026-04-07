@@ -314,7 +314,7 @@ export default function Chat() {
 
             <div className="p-3 md:p-4 border-t border-gray-200 bg-white">
               <div className="flex items-end gap-2">
-                <input type="text" value={input} onChange={handleInputChange} onKeyDown={handleKeyDown}
+                <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
                   placeholder="Type a message..."
                   className="flex-1 h-11 px-4 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1E90FF] focus:ring-1 focus:ring-[#1E90FF]/30 transition-colors" />
                 <button onClick={handleSend} disabled={!input.trim() || !wsConnected}

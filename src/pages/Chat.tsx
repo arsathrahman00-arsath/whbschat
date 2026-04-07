@@ -48,6 +48,9 @@ export default function Chat() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [wsConnected, setWsConnected] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const remoteTypingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();

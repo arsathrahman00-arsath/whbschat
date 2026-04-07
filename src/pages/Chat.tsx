@@ -93,25 +93,9 @@ export default function Chat() {
         const data = JSON.parse(event.data);
         console.log("WebSocket message received:", data);
 
-        // Handle typing indicator
-        if (data.type === "typing") {
-          const typerId = String(data.sender_id);
-          if (typerId !== String(currentUserId)) {
-            setTypingUsers(prev => ({ ...prev, [typerId]: true }));
-            if (remoteTypingTimeoutsRef.current[typerId]) clearTimeout(remoteTypingTimeoutsRef.current[typerId]);
-            remoteTypingTimeoutsRef.current[typerId] = setTimeout(() => {
-              setTypingUsers(prev => ({ ...prev, [typerId]: false }));
-            }, 2000);
-          }
-          return;
-        }
-
         const senderId = String(data.sender_id);
         const isFromMe = senderId === String(currentUserId);
         if (isFromMe) return;
-
-        // Clear typing when message arrives
-        setTypingUsers(prev => ({ ...prev, [senderId]: false }));
 
         addMessage(senderId, {
           id: `ws-${Date.now()}-${Math.random()}`,

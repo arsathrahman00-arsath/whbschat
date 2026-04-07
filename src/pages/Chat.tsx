@@ -48,9 +48,6 @@ export default function Chat() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [wsConnected, setWsConnected] = useState(false);
-  const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const remoteTypingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
@@ -96,25 +93,9 @@ export default function Chat() {
         const data = JSON.parse(event.data);
         console.log("WebSocket message received:", data);
 
-        // Handle typing indicator
-        if (data.type === "typing") {
-          const typerId = String(data.sender_id);
-          if (typerId !== String(currentUserId)) {
-            setTypingUsers(prev => ({ ...prev, [typerId]: true }));
-            if (remoteTypingTimeoutsRef.current[typerId]) clearTimeout(remoteTypingTimeoutsRef.current[typerId]);
-            remoteTypingTimeoutsRef.current[typerId] = setTimeout(() => {
-              setTypingUsers(prev => ({ ...prev, [typerId]: false }));
-            }, 2000);
-          }
-          return;
-        }
-
         const senderId = String(data.sender_id);
         const isFromMe = senderId === String(currentUserId);
         if (isFromMe) return;
-
-        // Clear typing when message arrives
-        setTypingUsers(prev => ({ ...prev, [senderId]: false }));
 
         addMessage(senderId, {
           id: `ws-${Date.now()}-${Math.random()}`,
@@ -204,20 +185,6 @@ export default function Chat() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
-    if (selectedUser && wsRef.current?.readyState === WebSocket.OPEN) {
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      wsRef.current.send(JSON.stringify({
-        type: "typing",
-        sender_id: currentUserId,
-        receiver_id: selectedUser.id,
-      }));
-      typingTimeoutRef.current = setTimeout(() => {}, 2000);
-    }
-  };
-
-  const isSelectedUserTyping = selectedUser ? typingUsers[String(selectedUser.id)] : false;
 
   const handleLogout = () => {
     if (wsRef.current) wsRef.current.close();
@@ -341,24 +308,13 @@ export default function Chat() {
                     </div>
                   </div>
                 ))}
-                {isSelectedUserTyping && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-200 px-4 py-2.5 rounded-2xl rounded-bl-md">
-                      <div className="flex items-center gap-1">
-                        <span className="h-2 w-2 rounded-full bg-gray-400 animate-bounce [animation-delay:0ms]" />
-                        <span className="h-2 w-2 rounded-full bg-gray-400 animate-bounce [animation-delay:150ms]" />
-                        <span className="h-2 w-2 rounded-full bg-gray-400 animate-bounce [animation-delay:300ms]" />
-                      </div>
-                    </div>
-                  </div>
-                )}
                 <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
 
             <div className="p-3 md:p-4 border-t border-gray-200 bg-white">
               <div className="flex items-end gap-2">
-                <input type="text" value={input} onChange={handleInputChange} onKeyDown={handleKeyDown}
+                <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
                   placeholder="Type a message..."
                   className="flex-1 h-11 px-4 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1E90FF] focus:ring-1 focus:ring-[#1E90FF]/30 transition-colors" />
                 <button onClick={handleSend} disabled={!input.trim() || !wsConnected}

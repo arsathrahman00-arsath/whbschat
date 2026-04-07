@@ -204,6 +204,21 @@ export default function Chat() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+    if (selectedUser && wsRef.current?.readyState === WebSocket.OPEN) {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      wsRef.current.send(JSON.stringify({
+        type: "typing",
+        sender_id: currentUserId,
+        receiver_id: selectedUser.id,
+      }));
+      typingTimeoutRef.current = setTimeout(() => {}, 2000);
+    }
+  };
+
+  const isSelectedUserTyping = selectedUser ? typingUsers[String(selectedUser.id)] : false;
+
   const handleLogout = () => {
     if (wsRef.current) wsRef.current.close();
     sessionStorage.removeItem("whchat_session");

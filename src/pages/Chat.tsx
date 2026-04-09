@@ -49,7 +49,7 @@ export default function Chat() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [wsConnected, setWsConnected] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [chatId, setChatId] = useState<string | number | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 

@@ -28,7 +28,6 @@ export default function Login() {
 
     setLoading(true);
     try {
-      // Step 1: Login
       const loginRes = await fetch("https://ngrchatbot.whindia.in/chat/user_login/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -45,36 +44,12 @@ export default function Login() {
         return;
       }
 
-      // Step 2: Create chat session using id and username from login response
-      const chatRes = await fetch("https://ngrchatbot.whindia.in/chat/create_chat/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: loginData.id,
-          created_by: loginData.username,
-        }),
-      });
-
-      const chatData = await chatRes.json();
-
-      if (!chatRes.ok) {
-        setResponse({
-          message: chatData.message || chatData.detail || JSON.stringify(chatData),
-          type: "error",
-        });
-        return;
-      }
-
-      // Store session info
       const session = {
-        userId: chatData.id || loginData.id,
-        username,
-        chatId: chatData.id,
-        created_by: chatData.created_by || username,
+        userId: loginData.id,
+        username: loginData.username || username,
       };
       sessionStorage.setItem("whchat_session", JSON.stringify(session));
 
-      // Redirect to chat
       navigate("/chat");
     } catch (err: any) {
       setResponse({ message: err.message || "Network error", type: "error" });

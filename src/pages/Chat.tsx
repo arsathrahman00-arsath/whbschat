@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Send, LogOut, Search, MessageCircle, WifiOff } from "lucide-react";
 import logo from "@/assets/logo.jpg";
 import ChatMessages from "@/components/ChatMessages";
+import { generateChatId } from "@/lib/chatId";
 
 interface ChatUser {
   id: number | string;

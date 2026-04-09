@@ -130,22 +130,11 @@ export default function Chat() {
     };
   }, []);
 
-  const handleSelectUser = async (user: ChatUser) => {
+  const handleSelectUser = (user: ChatUser) => {
     setSelectedUser(user);
     setSidebarOpen(false);
-    setChatId(null);
-    try {
-      const res = await fetch("https://ngrchatbot.whindia.in/chat/create_chat/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: currentUserId, created_by: session?.username }),
-      });
-      const data = await res.json();
-      const id = data.chat_id || data.id || data.data?.chat_id || data.data?.id;
-      if (id) setChatId(id);
-    } catch (err) {
-      console.error("Failed to create/get chat:", err);
-    }
+    const id = generateChatId(currentUserId, user.id);
+    setChatId(id);
   };
 
   const fetchUsers = async () => {

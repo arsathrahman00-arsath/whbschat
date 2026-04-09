@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Send, LogOut, Search, MessageCircle, WifiOff } from "lucide-react";
 import logo from "@/assets/logo.jpg";
+import ChatMessages from "@/components/ChatMessages";
 
 interface ChatUser {
   id: number | string;
@@ -48,7 +49,7 @@ export default function Chat() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [wsConnected, setWsConnected] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [chatId, setChatId] = useState<string | number | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -128,9 +129,23 @@ export default function Chat() {
     };
   }, []);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  const handleSelectUser = async (user: ChatUser) => {
+    setSelectedUser(user);
+    setSidebarOpen(false);
+    setChatId(null);
+    try {
+      const res = await fetch("https://ngrchatbot.whindia.in/chat/create_chat/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: currentUserId, created_by: session?.username }),
+      });
+      const data = await res.json();
+      const id = data.chat_id || data.id || data.data?.chat_id || data.data?.id;
+      if (id) setChatId(id);
+    } catch (err) {
+      console.error("Failed to create/get chat:", err);
+    }
+  };
 
   const fetchUsers = async () => {
     setLoadingUsers(true);
@@ -237,7 +252,7 @@ export default function Chat() {
           ) : (
             <div className="p-2 space-y-0.5">
               {filteredUsers.map(user => (
-                <button key={user.id} onClick={() => { setSelectedUser(user); setSidebarOpen(false); }}
+                <button key={user.id} onClick={() => handleSelectUser(user)}
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all active:scale-[0.98] ${
                     selectedUser?.id === user.id ? "bg-[#8B5CF6]/10 border border-[#8B5CF6]/20" : "hover:bg-gray-50"
                   }`}>
@@ -283,34 +298,12 @@ export default function Chat() {
               <p className="text-base font-semibold text-gray-900">{selectedUser.username}</p>
             </div>
 
-            <ScrollArea className="flex-1 bg-gray-50">
-              <div className="p-4 md:p-6 space-y-3 min-h-full flex flex-col justify-end">
-                {messages.length === 0 && (
-                  <div className="flex-1 flex items-center justify-center py-20">
-                    <div className="text-center">
-                      <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-[#1E90FF]/10 to-[#22C55E]/10 flex items-center justify-center mx-auto mb-3">
-                        <MessageCircle className="h-8 w-8 text-[#1E90FF]" />
-                      </div>
-                      <p className="text-gray-400 text-sm">
-                        Start a conversation with <span className="font-medium text-gray-600">{selectedUser.username}</span>
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {messages.map(msg => (
-                  <div key={msg.id} className={`flex ${msg.sender === "me" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                      msg.sender === "me"
-                        ? "bg-gradient-to-r from-[#1E90FF] to-[#22C55E] text-white rounded-br-md"
-                        : "bg-gray-200 text-gray-900 rounded-bl-md"
-                    }`}>
-                      <p className="break-words">{msg.text}</p>
-                    </div>
-                  </div>
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
-            </ScrollArea>
+            <ChatMessages
+              chatId={chatId}
+              currentUserId={currentUserId}
+              selectedUsername={selectedUser.username}
+              localMessages={messages}
+            />
 
             <div className="p-3 md:p-4 border-t border-gray-200 bg-white">
               <div className="flex items-end gap-2">

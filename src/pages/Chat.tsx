@@ -2,9 +2,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, LogOut, Search, MessageCircle, WifiOff } from "lucide-react";
+import { Send, LogOut, Search, MessageCircle, WifiOff, X } from "lucide-react";
 import logo from "@/assets/logo.jpg";
 import ChatMessages from "@/components/ChatMessages";
+import ForwardModal from "@/components/ForwardModal";
 import { generateChatId } from "@/lib/chatId";
 
 interface ChatUser {
@@ -25,6 +26,14 @@ interface Message {
   sender_id?: string | number;
   receiver_id?: string | number;
   time?: string;
+  deleted?: boolean;
+  reply_to?: { text: string; sender: string } | null;
+}
+
+interface ReplyTo {
+  id: string;
+  text: string;
+  isMe: boolean;
 }
 
 function getInitials(name: string) {
@@ -86,6 +95,8 @@ export default function Chat() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [wsConnected, setWsConnected] = useState(false);
   const [chatId, setChatId] = useState<string | number | null>(null);
+  const [replyTo, setReplyTo] = useState<ReplyTo | null>(null);
+  const [forwardMsg, setForwardMsg] = useState<{ text: string } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -213,11 +224,15 @@ export default function Chat() {
   const handleSend = () => {
     if (!input.trim() || !selectedUser) return;
 
-    const msgPayload = {
+    const msgPayload: any = {
       sender_id: currentUserId,
       receiver_id: selectedUser.id,
       message: input.trim(),
     };
+
+    if (replyTo) {
+      msgPayload.reply_to = replyTo.id;
+    }
 
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(msgPayload));
@@ -233,8 +248,53 @@ export default function Chat() {
       sender_id: currentUserId,
       receiver_id: selectedUser.id,
       time: getCurrentTime(),
+      reply_to: replyTo ? { text: replyTo.text, sender: replyTo.isMe ? "You" : selectedUser.username } : null,
     });
     setInput("");
+    setReplyTo(null);
+  };
+
+  const handleReply = (msg: { id: string; text: string; isMe: boolean }) => {
+    setReplyTo(msg);
+  };
+
+  const handleForwardRequest = (msg: { text: string }) => {
+    setForwardMsg(msg);
+  };
+
+  const handleForwardSend = (targetUserIds: (string | number)[]) => {
+    if (!forwardMsg || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify({
+      type: "forward_message",
+      sender_id: currentUserId,
+      message: forwardMsg.text,
+      target_user_ids: targetUserIds,
+    }));
+    setForwardMsg(null);
+  };
+
+  const handleDelete = (msg: { id: string; isMe: boolean; deleteType: "me" | "everyone" }) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "delete_message",
+        message_id: msg.id,
+        delete_type: msg.deleteType,
+      }));
+    }
+
+    // Update UI instantly
+    if (selectedUser) {
+      setMessagesByUser(prev => {
+        const userId = String(selectedUser.id);
+        const msgs = prev[userId] || [];
+        return {
+          ...prev,
+          [userId]: msgs.map(m =>
+            m.id === msg.id ? { ...m, deleted: true, text: "This message was deleted" } : m
+          ),
+        };
+      });
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -367,10 +427,29 @@ export default function Chat() {
               currentUserId={currentUserId}
               selectedUsername={selectedUser.username}
               localMessages={messages}
+              onReply={handleReply}
+              onForward={handleForwardRequest}
+              onDelete={handleDelete}
             />
 
-            <div className="p-3 md:p-4 border-t border-gray-200 bg-white">
-              <div className="flex items-end gap-2">
+            <div className="border-t border-gray-200 bg-white">
+              {/* Reply preview */}
+              {replyTo && (
+                <div className="px-3 pt-3 md:px-4 md:pt-3">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border-l-2 border-[#1E90FF]">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-[#1E90FF]">
+                        Replying to {replyTo.isMe ? "yourself" : selectedUser.username}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">{replyTo.text}</p>
+                    </div>
+                    <button onClick={() => setReplyTo(null)} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className="p-3 md:p-4 flex items-end gap-2">
                 <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
                   placeholder="Type a message..."
                   className="flex-1 h-11 px-4 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1E90FF] focus:ring-1 focus:ring-[#1E90FF]/30 transition-colors" />
@@ -396,6 +475,15 @@ export default function Chat() {
           </div>
         )}
       </div>
+
+      {/* Forward modal */}
+      <ForwardModal
+        open={!!forwardMsg}
+        onClose={() => setForwardMsg(null)}
+        users={users}
+        messageText={forwardMsg?.text || ""}
+        onForward={handleForwardSend}
+      />
     </div>
   );
 }

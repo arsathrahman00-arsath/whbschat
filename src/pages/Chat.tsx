@@ -13,6 +13,11 @@ interface ChatUser {
   user_code?: number;
 }
 
+interface UserStatusInfo {
+  status: "Active" | "Offline";
+  last_seen: string | null;
+}
+
 interface Message {
   id: string;
   text: string;
@@ -43,6 +48,30 @@ function getCurrentTime(): string {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
 }
 
+function formatLastSeen(lastSeen: string | null): string {
+  if (!lastSeen) return "Offline";
+  try {
+    const d = new Date(lastSeen.replace(" ", "T"));
+    if (isNaN(d.getTime())) return "Offline";
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const seenDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diff = today.getTime() - seenDay.getTime();
+    const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+    if (diff === 0) return `Last seen at ${time}`;
+    if (diff === 86400000) return "Last seen yesterday";
+    return `Last seen ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  } catch {
+    return "Offline";
+  }
+}
+
+function formatStatusDisplay(info: UserStatusInfo | undefined): { text: string; isActive: boolean } {
+  if (!info) return { text: "", isActive: false };
+  if (info.status === "Active") return { text: "Active", isActive: true };
+  return { text: formatLastSeen(info.last_seen), isActive: false };
+}
+
 const WS_BASE_URL = "wss://ngrchatbot.whindia.in/ws/chat";
 
 export default function Chat() {
@@ -50,7 +79,7 @@ export default function Chat() {
   const [users, setUsers] = useState<ChatUser[]>([]);
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
   const [messagesByUser, setMessagesByUser] = useState<Record<string, Message[]>>({});
-  const [userStatuses, setUserStatuses] = useState<Record<string, string>>({});
+  const [userStatuses, setUserStatuses] = useState<Record<string, UserStatusInfo>>({});
   const [input, setInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -101,7 +130,10 @@ export default function Chat() {
         if (data.type === "user_status") {
           setUserStatuses(prev => ({
             ...prev,
-            [String(data.user_id)]: data.status || "Offline",
+            [String(data.user_id)]: {
+              status: data.status === "Active" ? "Active" : "Offline",
+              last_seen: data.last_seen || null,
+            },
           }));
           return;
         }
@@ -209,7 +241,8 @@ export default function Chat() {
 
   const filteredUsers = users.filter(u => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const selectedUserStatus = selectedUser ? (userStatuses[String(selectedUser.id)] || "") : "";
+  const selectedUserStatusInfo = selectedUser ? userStatuses[String(selectedUser.id)] : undefined;
+  const selectedStatusDisplay = formatStatusDisplay(selectedUserStatusInfo);
 
   return (
     <div className="flex h-screen bg-white overflow-hidden">
@@ -267,11 +300,15 @@ export default function Chat() {
                     <p className={`text-sm font-medium truncate ${selectedUser?.id === user.id ? "text-[#8B5CF6]" : "text-gray-900"}`}>
                       {user.username}
                     </p>
-                    {userStatuses[String(user.id)] && (
-                      <p className={`text-xs ${userStatuses[String(user.id)] === "Active" ? "text-green-500" : "text-gray-400"}`}>
-                        {userStatuses[String(user.id)]}
-                      </p>
-                    )}
+                    {(() => {
+                      const s = formatStatusDisplay(userStatuses[String(user.id)]);
+                      return s.text ? (
+                        <p className={`text-xs flex items-center gap-1 ${s.isActive ? "text-green-500" : "text-muted-foreground"}`}>
+                          {s.isActive && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />}
+                          {s.text}
+                        </p>
+                      ) : null;
+                    })()}
                   </div>
                 </button>
               ))}
@@ -306,9 +343,10 @@ export default function Chat() {
               </Avatar>
               <div>
                 <p className="text-base font-semibold text-gray-900">{selectedUser.username}</p>
-                {selectedUserStatus && (
-                  <p className={`text-xs ${selectedUserStatus === "Active" ? "text-green-500" : "text-gray-400"}`}>
-                    {selectedUserStatus}
+                {selectedStatusDisplay.text && (
+                  <p className={`text-xs flex items-center gap-1 ${selectedStatusDisplay.isActive ? "text-green-500" : "text-muted-foreground"}`}>
+                    {selectedStatusDisplay.isActive && <span className="inline-block h-2 w-2 rounded-full bg-green-500" />}
+                    {selectedStatusDisplay.text}
                   </p>
                 )}
               </div>

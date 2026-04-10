@@ -26,6 +26,14 @@ interface Message {
   sender_id?: string | number;
   receiver_id?: string | number;
   time?: string;
+  deleted?: boolean;
+  reply_to?: { text: string; sender: string } | null;
+}
+
+interface ReplyTo {
+  id: string;
+  text: string;
+  isMe: boolean;
 }
 
 function getInitials(name: string) {

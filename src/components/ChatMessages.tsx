@@ -5,17 +5,29 @@ import { MessageCircle } from "lucide-react";
 interface ChatMessage {
   sender_id: string;
   message: string;
-  created_at: string;
+  created_at?: string;
+  time?: string;
 }
 
 interface ChatMessagesProps {
   chatId: string | number | null;
   currentUserId: string | number;
   selectedUsername: string;
-  localMessages: { id: string; text: string; sender: "me" | "other" }[];
+  localMessages: { id: string; text: string; sender: "me" | "other"; time?: string }[];
 }
 
 const API_BASE = "https://ngrchatbot.whindia.in";
+
+function formatTime(dateStr?: string): string {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+  } catch {
+    return dateStr;
+  }
+}
 
 export default function ChatMessages({
   chatId,
@@ -88,6 +100,7 @@ export default function ChatMessages({
         {/* API-loaded messages */}
         {apiMessages.map((msg, idx) => {
           const isMe = String(msg.sender_id) === String(currentUserId);
+          const time = formatTime(msg.created_at) || msg.time || "";
           return (
             <div
               key={`api-${idx}`}
@@ -101,28 +114,41 @@ export default function ChatMessages({
                 }`}
               >
                 <p className="break-words">{msg.message}</p>
+                {time && (
+                  <p className={`text-[10px] mt-1 text-right ${isMe ? "text-white/60" : "text-muted-foreground/60"}`}>
+                    {time}
+                  </p>
+                )}
               </div>
             </div>
           );
         })}
 
         {/* Locally added messages (sent/received via WebSocket) */}
-        {localMessages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
-          >
+        {localMessages.map((msg) => {
+          const time = msg.time || "";
+          return (
             <div
-              className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                msg.sender === "me"
-                  ? "bg-gradient-to-r from-[#1E90FF] to-[#22C55E] text-white rounded-br-md"
-                  : "bg-muted text-foreground rounded-bl-md"
-              }`}
+              key={msg.id}
+              className={`flex ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
             >
-              <p className="break-words">{msg.text}</p>
+              <div
+                className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                  msg.sender === "me"
+                    ? "bg-gradient-to-r from-[#1E90FF] to-[#22C55E] text-white rounded-br-md"
+                    : "bg-muted text-foreground rounded-bl-md"
+                }`}
+              >
+                <p className="break-words">{msg.text}</p>
+                {time && (
+                  <p className={`text-[10px] mt-1 text-right ${msg.sender === "me" ? "text-white/60" : "text-muted-foreground/60"}`}>
+                    {time}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         <div ref={messagesEndRef} />
       </div>

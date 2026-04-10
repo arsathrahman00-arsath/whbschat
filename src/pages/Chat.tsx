@@ -19,6 +19,7 @@ interface Message {
   sender: "me" | "other";
   sender_id?: string | number;
   receiver_id?: string | number;
+  time?: string;
 }
 
 function getInitials(name: string) {
@@ -38,6 +39,10 @@ function getAvatarColor(name: string) {
   return colors[Math.abs(hash) % colors.length];
 }
 
+function getCurrentTime(): string {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+}
+
 const WS_BASE_URL = "wss://ngrchatbot.whindia.in/ws/chat";
 
 export default function Chat() {
@@ -45,6 +50,7 @@ export default function Chat() {
   const [users, setUsers] = useState<ChatUser[]>([]);
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
   const [messagesByUser, setMessagesByUser] = useState<Record<string, Message[]>>({});
+  const [userStatuses, setUserStatuses] = useState<Record<string, string>>({});
   const [input, setInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -74,14 +80,10 @@ export default function Chat() {
   }, []);
 
   const connectWebSocket = useCallback(() => {
-    if (!currentUserId) {
-      console.warn("No currentUserId, skipping WebSocket connection");
-      return;
-    }
+    if (!currentUserId) return;
     if (wsRef.current) wsRef.current.close();
 
     const wsUrl = `${WS_BASE_URL}/${currentUserId}/`;
-    console.log("Connecting WebSocket to:", wsUrl);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -95,6 +97,16 @@ export default function Chat() {
         const data = JSON.parse(event.data);
         console.log("WebSocket message received:", data);
 
+        // Handle user_status messages
+        if (data.type === "user_status") {
+          setUserStatuses(prev => ({
+            ...prev,
+            [String(data.user_id)]: data.status || "Offline",
+          }));
+          return;
+        }
+
+        // Handle chat_message (or default message type)
         const senderId = String(data.sender_id);
         const isFromMe = senderId === String(currentUserId);
         if (isFromMe) return;
@@ -105,14 +117,14 @@ export default function Chat() {
           sender: "other",
           sender_id: data.sender_id,
           receiver_id: data.receiver_id,
+          time: data.time || getCurrentTime(),
         });
       } catch (err) {
         console.error("Failed to parse WebSocket message:", err);
       }
     };
 
-    ws.onclose = (event) => {
-      console.log("WebSocket closed:", event.code, event.reason);
+    ws.onclose = () => {
       setWsConnected(false);
       reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
     };
@@ -160,14 +172,13 @@ export default function Chat() {
 
   const handleSend = () => {
     if (!input.trim() || !selectedUser) return;
-    
+
     const msgPayload = {
       sender_id: currentUserId,
       receiver_id: selectedUser.id,
       message: input.trim(),
     };
 
-    // Try sending via WebSocket
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(msgPayload));
     } else {
@@ -175,13 +186,13 @@ export default function Chat() {
       connectWebSocket();
     }
 
-    // Show message locally regardless
     addMessage(String(selectedUser.id), {
       id: `sent-${Date.now()}`,
       text: input.trim(),
       sender: "me",
       sender_id: currentUserId,
       receiver_id: selectedUser.id,
+      time: getCurrentTime(),
     });
     setInput("");
   };
@@ -190,7 +201,6 @@ export default function Chat() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-
   const handleLogout = () => {
     if (wsRef.current) wsRef.current.close();
     sessionStorage.removeItem("whchat_session");
@@ -198,6 +208,8 @@ export default function Chat() {
   };
 
   const filteredUsers = users.filter(u => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const selectedUserStatus = selectedUser ? (userStatuses[String(selectedUser.id)] || "") : "";
 
   return (
     <div className="flex h-screen bg-white overflow-hidden">
@@ -251,9 +263,16 @@ export default function Chat() {
                       {getInitials(user.username)}
                     </AvatarFallback>
                   </Avatar>
-                  <p className={`text-sm font-medium truncate ${selectedUser?.id === user.id ? "text-[#8B5CF6]" : "text-gray-900"}`}>
-                    {user.username}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium truncate ${selectedUser?.id === user.id ? "text-[#8B5CF6]" : "text-gray-900"}`}>
+                      {user.username}
+                    </p>
+                    {userStatuses[String(user.id)] && (
+                      <p className={`text-xs ${userStatuses[String(user.id)] === "Active" ? "text-green-500" : "text-gray-400"}`}>
+                        {userStatuses[String(user.id)]}
+                      </p>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>
@@ -285,7 +304,14 @@ export default function Chat() {
                   {getInitials(selectedUser.username)}
                 </AvatarFallback>
               </Avatar>
-              <p className="text-base font-semibold text-gray-900">{selectedUser.username}</p>
+              <div>
+                <p className="text-base font-semibold text-gray-900">{selectedUser.username}</p>
+                {selectedUserStatus && (
+                  <p className={`text-xs ${selectedUserStatus === "Active" ? "text-green-500" : "text-gray-400"}`}>
+                    {selectedUserStatus}
+                  </p>
+                )}
+              </div>
             </div>
 
             <ChatMessages

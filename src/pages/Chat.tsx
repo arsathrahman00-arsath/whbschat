@@ -224,11 +224,15 @@ export default function Chat() {
   const handleSend = () => {
     if (!input.trim() || !selectedUser) return;
 
-    const msgPayload = {
+    const msgPayload: any = {
       sender_id: currentUserId,
       receiver_id: selectedUser.id,
       message: input.trim(),
     };
+
+    if (replyTo) {
+      msgPayload.reply_to = replyTo.id;
+    }
 
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(msgPayload));
@@ -244,8 +248,53 @@ export default function Chat() {
       sender_id: currentUserId,
       receiver_id: selectedUser.id,
       time: getCurrentTime(),
+      reply_to: replyTo ? { text: replyTo.text, sender: replyTo.isMe ? "You" : selectedUser.username } : null,
     });
     setInput("");
+    setReplyTo(null);
+  };
+
+  const handleReply = (msg: { id: string; text: string; isMe: boolean }) => {
+    setReplyTo(msg);
+  };
+
+  const handleForwardRequest = (msg: { text: string }) => {
+    setForwardMsg(msg);
+  };
+
+  const handleForwardSend = (targetUserIds: (string | number)[]) => {
+    if (!forwardMsg || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify({
+      type: "forward_message",
+      sender_id: currentUserId,
+      message: forwardMsg.text,
+      target_user_ids: targetUserIds,
+    }));
+    setForwardMsg(null);
+  };
+
+  const handleDelete = (msg: { id: string; isMe: boolean; deleteType: "me" | "everyone" }) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "delete_message",
+        message_id: msg.id,
+        delete_type: msg.deleteType,
+      }));
+    }
+
+    // Update UI instantly
+    if (selectedUser) {
+      setMessagesByUser(prev => {
+        const userId = String(selectedUser.id);
+        const msgs = prev[userId] || [];
+        return {
+          ...prev,
+          [userId]: msgs.map(m =>
+            m.id === msg.id ? { ...m, deleted: true, text: "This message was deleted" } : m
+          ),
+        };
+      });
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

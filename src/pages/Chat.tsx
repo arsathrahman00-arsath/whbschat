@@ -427,10 +427,29 @@ export default function Chat() {
               currentUserId={currentUserId}
               selectedUsername={selectedUser.username}
               localMessages={messages}
+              onReply={handleReply}
+              onForward={handleForwardRequest}
+              onDelete={handleDelete}
             />
 
-            <div className="p-3 md:p-4 border-t border-gray-200 bg-white">
-              <div className="flex items-end gap-2">
+            <div className="border-t border-gray-200 bg-white">
+              {/* Reply preview */}
+              {replyTo && (
+                <div className="px-3 pt-3 md:px-4 md:pt-3">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border-l-2 border-[#1E90FF]">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-[#1E90FF]">
+                        Replying to {replyTo.isMe ? "yourself" : selectedUser.username}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">{replyTo.text}</p>
+                    </div>
+                    <button onClick={() => setReplyTo(null)} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className="p-3 md:p-4 flex items-end gap-2">
                 <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
                   placeholder="Type a message..."
                   className="flex-1 h-11 px-4 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1E90FF] focus:ring-1 focus:ring-[#1E90FF]/30 transition-colors" />
@@ -456,6 +475,15 @@ export default function Chat() {
           </div>
         )}
       </div>
+
+      {/* Forward modal */}
+      <ForwardModal
+        open={!!forwardMsg}
+        onClose={() => setForwardMsg(null)}
+        users={users}
+        messageText={forwardMsg?.text || ""}
+        onForward={handleForwardSend}
+      />
     </div>
   );
 }

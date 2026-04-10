@@ -137,8 +137,8 @@ export default function ChatMessages({
 
   apiMessages.forEach((msg, idx) => {
     unified.push({
-      key: `api-${idx}`,
-      id: msg.id || `api-${idx}`,
+      key: msg.id || `api-${idx}`,
+      id: msg.id || "",
       isMe: String(msg.sender_id) === String(currentUserId),
       text: msg.deleted ? "This message was deleted" : msg.message,
       time: formatTime(msg.created_at) || msg.time || "",

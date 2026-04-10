@@ -154,8 +154,22 @@ export default function Chat() {
         const isFromMe = senderId === String(currentUserId);
         if (isFromMe) return;
 
+        // Handle message_deleted events
+        if (data.type === "message_deleted") {
+          setMessagesByUser(prev => {
+            const updated: typeof prev = {};
+            for (const key of Object.keys(prev)) {
+              updated[key] = prev[key].map(m =>
+                m.id === data.message_id ? { ...m, deleted: true, text: "This message was deleted" } : m
+              );
+            }
+            return updated;
+          });
+          return;
+        }
+
         addMessage(senderId, {
-          id: `ws-${Date.now()}-${Math.random()}`,
+          id: data.id || data.message_id || `ws-${Date.now()}`,
           text: data.message,
           sender: "other",
           sender_id: data.sender_id,

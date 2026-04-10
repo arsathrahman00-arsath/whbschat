@@ -179,6 +179,14 @@ export default function Chat() {
     setSidebarOpen(false);
     const id = generateChatId(currentUserId, user.id);
     setChatId(id);
+
+    // Request user status from backend via WebSocket
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "get_status",
+        target_user_id: user.id,
+      }));
+    }
   };
 
   const fetchUsers = async () => {
@@ -241,7 +249,9 @@ export default function Chat() {
 
   const filteredUsers = users.filter(u => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const selectedUserStatusInfo = selectedUser ? userStatuses[String(selectedUser.id)] : undefined;
+  const selectedUserStatusInfo = selectedUser
+    ? userStatuses[String(selectedUser.id)] || { status: "Offline" as const, last_seen: null }
+    : undefined;
   const selectedStatusDisplay = formatStatusDisplay(selectedUserStatusInfo);
 
   return (

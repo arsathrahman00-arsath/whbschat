@@ -13,6 +13,11 @@ interface ChatUser {
   user_code?: number;
 }
 
+interface UserStatusInfo {
+  status: "Active" | "Offline";
+  last_seen: string | null;
+}
+
 interface Message {
   id: string;
   text: string;
@@ -50,7 +55,7 @@ export default function Chat() {
   const [users, setUsers] = useState<ChatUser[]>([]);
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
   const [messagesByUser, setMessagesByUser] = useState<Record<string, Message[]>>({});
-  const [userStatuses, setUserStatuses] = useState<Record<string, string>>({});
+  const [userStatuses, setUserStatuses] = useState<Record<string, UserStatusInfo>>({});
   const [input, setInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -101,7 +106,10 @@ export default function Chat() {
         if (data.type === "user_status") {
           setUserStatuses(prev => ({
             ...prev,
-            [String(data.user_id)]: data.status || "Offline",
+            [String(data.user_id)]: {
+              status: data.status === "Active" ? "Active" : "Offline",
+              last_seen: data.last_seen || null,
+            },
           }));
           return;
         }

@@ -29,6 +29,40 @@ function formatTime(dateStr?: string): string {
   }
 }
 
+function getDateOnly(dateStr?: string): string | null {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  } catch {
+    return null;
+  }
+}
+
+function formatDateLabel(dateStr?: string): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = today.getTime() - msgDay.getTime();
+  if (diff === 0) return "Today";
+  if (diff === 86400000) return "Yesterday";
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function DateSeparator({ label }: { label: string }) {
+  return (
+    <div className="flex justify-center my-3">
+      <span className="text-xs px-3 py-1 rounded-lg bg-muted text-muted-foreground shadow-sm">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 export default function ChatMessages({
   chatId,
   currentUserId,
@@ -70,7 +104,68 @@ export default function ChatMessages({
     }
   };
 
-  const allEmpty = apiMessages.length === 0 && localMessages.length === 0;
+  // Build unified message list
+  const allMessages: { type: "api"; msg: ChatMessage; idx: number }[] | { type: "local"; msg: typeof localMessages[0] }[] = [];
+  const unified: Array<{
+    key: string;
+    isMe: boolean;
+    text: string;
+    time: string;
+    dateSource: string | undefined;
+  }> = [];
+
+  apiMessages.forEach((msg, idx) => {
+    unified.push({
+      key: `api-${idx}`,
+      isMe: String(msg.sender_id) === String(currentUserId),
+      text: msg.message,
+      time: formatTime(msg.created_at) || msg.time || "",
+      dateSource: msg.created_at || msg.time,
+    });
+  });
+
+  localMessages.forEach((msg) => {
+    unified.push({
+      key: msg.id,
+      isMe: msg.sender === "me",
+      text: msg.text,
+      time: msg.time || "",
+      dateSource: msg.time,
+    });
+  });
+
+  const allEmpty = unified.length === 0;
+
+  // Render with date separators
+  let lastDateKey: string | null = null;
+  const rendered: React.ReactNode[] = [];
+
+  unified.forEach((m) => {
+    const dateKey = getDateOnly(m.dateSource);
+    if (dateKey && dateKey !== lastDateKey) {
+      const label = formatDateLabel(m.dateSource);
+      if (label) rendered.push(<DateSeparator key={`sep-${dateKey}`} label={label} />);
+      lastDateKey = dateKey;
+    }
+    rendered.push(
+      <div key={m.key} className={`flex ${m.isMe ? "justify-end" : "justify-start"}`}>
+        <div
+          className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+            m.isMe
+              ? "bg-gradient-to-r from-[#1E90FF] to-[#22C55E] text-white rounded-br-md"
+              : "bg-muted text-foreground rounded-bl-md"
+          }`}
+        >
+          <p className="break-words">{m.text}</p>
+          {m.time && (
+            <p className={`text-[10px] mt-1 text-right ${m.isMe ? "text-white/60" : "text-muted-foreground/60"}`}>
+              {m.time}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  });
 
   return (
     <ScrollArea className="flex-1 bg-muted/30">
@@ -97,58 +192,7 @@ export default function ChatMessages({
           </div>
         )}
 
-        {/* API-loaded messages */}
-        {apiMessages.map((msg, idx) => {
-          const isMe = String(msg.sender_id) === String(currentUserId);
-          const time = formatTime(msg.created_at) || msg.time || "";
-          return (
-            <div
-              key={`api-${idx}`}
-              className={`flex ${isMe ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                  isMe
-                    ? "bg-gradient-to-r from-[#1E90FF] to-[#22C55E] text-white rounded-br-md"
-                    : "bg-muted text-foreground rounded-bl-md"
-                }`}
-              >
-                <p className="break-words">{msg.message}</p>
-                {time && (
-                  <p className={`text-[10px] mt-1 text-right ${isMe ? "text-white/60" : "text-muted-foreground/60"}`}>
-                    {time}
-                  </p>
-                )}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Locally added messages (sent/received via WebSocket) */}
-        {localMessages.map((msg) => {
-          const time = msg.time || "";
-          return (
-            <div
-              key={msg.id}
-              className={`flex ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                  msg.sender === "me"
-                    ? "bg-gradient-to-r from-[#1E90FF] to-[#22C55E] text-white rounded-br-md"
-                    : "bg-muted text-foreground rounded-bl-md"
-                }`}
-              >
-                <p className="break-words">{msg.text}</p>
-                {time && (
-                  <p className={`text-[10px] mt-1 text-right ${msg.sender === "me" ? "text-white/60" : "text-muted-foreground/60"}`}>
-                    {time}
-                  </p>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {rendered}
 
         <div ref={messagesEndRef} />
       </div>

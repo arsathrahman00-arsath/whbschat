@@ -189,6 +189,11 @@ export default function Chat() {
           sender_id: data.sender_id,
           receiver_id: data.receiver_id,
           time: data.time || getCurrentTime(),
+          reply_to: data.reply_to
+            ? (typeof data.reply_to === "object"
+              ? data.reply_to
+              : { text: data.reply_to_text || "", sender: data.reply_to_sender || "" })
+            : null,
         });
       } catch (err) {
         console.error("Failed to parse WebSocket message:", err);

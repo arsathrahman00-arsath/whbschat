@@ -7,7 +7,6 @@ import logo from "@/assets/logo.jpg";
 import ChatMessages from "@/components/ChatMessages";
 import ForwardModal from "@/components/ForwardModal";
 import { generateChatId } from "@/lib/chatId";
-import { useToast } from "@/hooks/use-toast";
 
 interface ChatUser {
   id: number | string;

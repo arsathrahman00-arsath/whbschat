@@ -166,9 +166,7 @@ export default function Chat() {
           };
         }
 
-        if (isFromMe) return;
-
-        // Handle message_deleted events
+        // Handle message_deleted events (before isFromMe check — applies to all users)
         if (data.type === "message_deleted") {
           setMessagesByUser(prev => {
             const updated: typeof prev = {};
@@ -181,6 +179,8 @@ export default function Chat() {
           });
           return;
         }
+
+        if (isFromMe) return;
 
         addMessage(senderId, {
           id: data.id || data.message_id || `ws-${Date.now()}`,
@@ -307,26 +307,30 @@ export default function Chat() {
   };
 
   const handleDelete = (msg: { id: string; isMe: boolean; deleteType: "me" | "everyone" }) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: "delete_message",
-        message_id: msg.id,
-        delete_type: msg.deleteType,
-      }));
-    }
+    if (!selectedUser) return;
+    const userId = String(selectedUser.id);
 
-    // Update UI instantly
-    if (selectedUser) {
-      setMessagesByUser(prev => {
-        const userId = String(selectedUser.id);
-        const msgs = prev[userId] || [];
-        return {
-          ...prev,
-          [userId]: msgs.map(m =>
-            m.id === msg.id ? { ...m, deleted: true, text: "This message was deleted" } : m
-          ),
-        };
-      });
+    if (msg.deleteType === "everyone") {
+      // Send delete via WebSocket for both users
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: "delete_message",
+          message_id: msg.id,
+        }));
+      }
+      // Update UI instantly
+      setMessagesByUser(prev => ({
+        ...prev,
+        [userId]: (prev[userId] || []).map(m =>
+          m.id === msg.id ? { ...m, deleted: true, text: "This message was deleted" } : m
+        ),
+      }));
+    } else {
+      // Delete for Me — remove from local state only, no WebSocket
+      setMessagesByUser(prev => ({
+        ...prev,
+        [userId]: (prev[userId] || []).filter(m => m.id !== msg.id),
+      }));
     }
   };
 

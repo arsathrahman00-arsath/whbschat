@@ -152,6 +152,20 @@ export default function Chat() {
         // Handle chat_message (or default message type)
         const senderId = String(data.sender_id);
         const isFromMe = senderId === String(currentUserId);
+
+        // Show desktop notification for incoming messages when tab is inactive
+        if (!isFromMe && data.type === "chat_message" && "Notification" in window && Notification.permission === "granted" && document.hidden) {
+          const senderName = data.sender_name || users.find(u => String(u.id) === senderId)?.username || "New Message";
+          const notification = new Notification(senderName, {
+            body: data.message,
+            icon: "/logo.png",
+          });
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+          };
+        }
+
         if (isFromMe) return;
 
         // Handle message_deleted events

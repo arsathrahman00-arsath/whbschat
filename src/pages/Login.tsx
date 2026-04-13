@@ -50,6 +50,11 @@ export default function Login() {
       };
       sessionStorage.setItem("whchat_session", JSON.stringify(session));
 
+      // Request notification permission after successful login
+      if ("Notification" in window && Notification.permission !== "granted") {
+        Notification.requestPermission();
+      }
+
       navigate("/chat");
     } catch (err: any) {
       setResponse({ message: err.message || "Network error", type: "error" });

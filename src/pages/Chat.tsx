@@ -149,6 +149,21 @@ export default function Chat() {
           return;
         }
 
+        // Handle message_deleted FIRST — before any sender checks
+        if (data.type === "message_deleted") {
+          console.log("Processing message_deleted:", data.message_id);
+          setMessagesByUser(prev => {
+            const updated: typeof prev = {};
+            for (const key of Object.keys(prev)) {
+              updated[key] = prev[key].map(m =>
+                m.id === data.message_id ? { ...m, deleted: true, text: "This message was deleted" } : m
+              );
+            }
+            return updated;
+          });
+          return;
+        }
+
         // Handle chat_message (or default message type)
         const senderId = String(data.sender_id);
         const isFromMe = senderId === String(currentUserId);
@@ -164,20 +179,6 @@ export default function Chat() {
             window.focus();
             notification.close();
           };
-        }
-
-        // Handle message_deleted events (before isFromMe check — applies to all users)
-        if (data.type === "message_deleted") {
-          setMessagesByUser(prev => {
-            const updated: typeof prev = {};
-            for (const key of Object.keys(prev)) {
-              updated[key] = prev[key].map(m =>
-                m.id === data.message_id ? { ...m, deleted: true, text: "This message was deleted" } : m
-              );
-            }
-            return updated;
-          });
-          return;
         }
 
         if (isFromMe) return;

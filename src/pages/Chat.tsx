@@ -166,9 +166,7 @@ export default function Chat() {
           };
         }
 
-        if (isFromMe) return;
-
-        // Handle message_deleted events
+        // Handle message_deleted events (before isFromMe check — applies to all users)
         if (data.type === "message_deleted") {
           setMessagesByUser(prev => {
             const updated: typeof prev = {};
@@ -181,6 +179,8 @@ export default function Chat() {
           });
           return;
         }
+
+        if (isFromMe) return;
 
         addMessage(senderId, {
           id: data.id || data.message_id || `ws-${Date.now()}`,

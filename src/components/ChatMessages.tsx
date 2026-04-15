@@ -39,7 +39,7 @@ interface ChatMessagesProps {
   }[];
   onReply?: (msg: { id: string; text: string; isMe: boolean }) => void;
   onForward?: (msg: { text: string }) => void;
-  onDelete?: (msg: { id: string; isMe: boolean; deleteType: "me" | "everyone" }) => void;
+  onDelete?: (msg: { id: string; isMe: boolean }) => void;
 }
 
 const API_BASE = "https://ngrchatbot.whindia.in";
@@ -324,24 +324,13 @@ export default function ChatMessages({
             <div className="space-y-2">
               <button
                 onClick={() => {
-                  if (onDelete && deleteConfirm.id) onDelete({ id: deleteConfirm.id, isMe: deleteConfirm.isMe, deleteType: "me" });
+                  if (onDelete && deleteConfirm.id) onDelete({ id: deleteConfirm.id, isMe: deleteConfirm.isMe });
                   setDeleteConfirm(null);
                 }}
-                className="w-full py-2.5 text-sm text-foreground hover:bg-muted rounded-xl transition-colors"
+                className="w-full py-2.5 text-sm text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
               >
-                Delete for Me
+                Delete Message
               </button>
-              {deleteConfirm.isMe && (
-                <button
-                  onClick={() => {
-                    if (onDelete && deleteConfirm.id) onDelete({ id: deleteConfirm.id, isMe: deleteConfirm.isMe, deleteType: "everyone" });
-                    setDeleteConfirm(null);
-                  }}
-                  className="w-full py-2.5 text-sm text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
-                >
-                  Delete for Everyone
-                </button>
-              )}
               <button
                 onClick={() => setDeleteConfirm(null)}
                 className="w-full py-2.5 text-sm text-muted-foreground hover:bg-muted rounded-xl transition-colors"

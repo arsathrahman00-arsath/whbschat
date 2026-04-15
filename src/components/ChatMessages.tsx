@@ -190,7 +190,7 @@ export default function ChatMessages({
   let lastDateKey: string | null = null;
   const rendered: React.ReactNode[] = [];
 
-  unified.forEach((m) => {
+  unified.forEach((m, idx) => {
     const dateKey = getDateOnly(m.dateSource);
     if (dateKey && dateKey !== lastDateKey) {
       const label = formatDateLabel(m.dateSource);
@@ -198,40 +198,63 @@ export default function ChatMessages({
       lastDateKey = dateKey;
     }
 
+    const prevMsg = idx > 0 ? unified[idx - 1] : null;
+    const nextMsg = idx < unified.length - 1 ? unified[idx + 1] : null;
+    const sameSenderAsPrev = prevMsg && prevMsg.isMe === m.isMe && getDateOnly(prevMsg.dateSource) === dateKey;
+    const sameSenderAsNext = nextMsg && nextMsg.isMe === m.isMe && getDateOnly(nextMsg.dateSource) === dateKey;
+
+    // Telegram-style spacing: tight for same sender, larger gap on sender change
+    const spacingClass = sameSenderAsPrev ? "mt-[3px]" : "mt-[10px]";
+
+    // Telegram-style bubble tail rounding
+    const getBubbleRadius = () => {
+      if (m.isMe) {
+        const topRight = sameSenderAsPrev ? "rounded-tr-md" : "rounded-tr-2xl";
+        const bottomRight = sameSenderAsNext ? "rounded-br-md" : "rounded-br-md";
+        return `rounded-tl-2xl ${topRight} rounded-bl-2xl ${bottomRight}`;
+      } else {
+        const topLeft = sameSenderAsPrev ? "rounded-tl-md" : "rounded-tl-2xl";
+        const bottomLeft = sameSenderAsNext ? "rounded-bl-md" : "rounded-bl-md";
+        return `${topLeft} rounded-tr-2xl ${bottomLeft} rounded-br-2xl`;
+      }
+    };
+
     rendered.push(
       <div
         key={m.key}
-        className={`flex ${m.isMe ? "justify-end" : "justify-start"}`}
+        className={`flex ${m.isMe ? "justify-end" : "justify-start"} ${idx === 0 ? "" : spacingClass}`}
         onContextMenu={(e) => handleContextMenu(e, m)}
         onTouchStart={(e) => handleTouchStart(e, m)}
         onTouchEnd={handleTouchEnd}
         onTouchMove={handleTouchEnd}
       >
         <div
-          className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed select-none ${
+          className={`max-w-[65%] px-3 py-[6px] text-[14px] leading-[1.35] select-none ${getBubbleRadius()} ${
             m.deleted
               ? "bg-muted/50 text-muted-foreground italic"
               : m.isMe
-                ? "bg-gradient-to-r from-[#1E90FF] to-[#22C55E] text-white rounded-br-md"
-                : "bg-muted text-foreground rounded-bl-md"
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-foreground shadow-sm"
           }`}
         >
           {/* Reply quote */}
           {m.reply_to && !m.deleted && (
-            <div className={`mb-1.5 px-2.5 py-1.5 rounded-lg border-l-2 text-xs ${
+            <div className={`mb-1 px-2 py-1 rounded border-l-2 text-xs ${
               m.isMe
-                ? "bg-white/15 border-white/40 text-white/80"
-                : "bg-background/60 border-primary/40 text-muted-foreground"
+                ? "bg-primary-foreground/10 border-primary-foreground/40 text-primary-foreground/80"
+                : "bg-muted/60 border-primary/40 text-muted-foreground"
             }`}>
               <p className="font-medium text-[10px] mb-0.5">{m.reply_to.sender}</p>
               <p className="line-clamp-2">{m.reply_to.text}</p>
             </div>
           )}
-          <p className="break-words">{m.text}</p>
+          <span className="break-words whitespace-pre-wrap">{m.text}</span>
           {m.time && !m.deleted && (
-            <p className={`text-[10px] mt-1 text-right ${m.isMe ? "text-white/60" : "text-muted-foreground/60"}`}>
+            <span className={`text-[11px] float-right mt-[2px] ml-3 leading-[1.6] ${
+              m.isMe ? "text-primary-foreground/50" : "text-muted-foreground/60"
+            }`}>
               {m.time}
-            </p>
+            </span>
           )}
         </div>
       </div>

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, LogOut, Search, MessageCircle, WifiOff, X } from "lucide-react";
+import { Send, LogOut, Search, MessageCircle, WifiOff, X, Smile } from "lucide-react";
 import logo from "@/assets/logo.jpg";
 import ChatMessages from "@/components/ChatMessages";
 import ForwardModal from "@/components/ForwardModal";
@@ -470,31 +470,39 @@ export default function Chat() {
               onDelete={handleDelete}
             />
 
-            <div className="border-t border-gray-200 bg-white">
+            <div className="bg-[#e8ebf0] px-2 py-[5px] md:px-[10px]">
               {/* Reply preview */}
               {replyTo && (
-                <div className="px-3 pt-3 md:px-4 md:pt-3">
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border-l-2 border-[#1E90FF]">
+                <div className="mb-[5px]">
+                  <div className="flex items-center gap-2 px-3 py-[6px] rounded-xl bg-white/80 border-l-[3px] border-[#3390ec]">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-[#1E90FF]">
-                        Replying to {replyTo.isMe ? "yourself" : selectedUser.username}
+                      <p className="text-[13px] font-semibold text-[#3390ec] leading-tight">
+                        {replyTo.isMe ? "You" : selectedUser.username}
                       </p>
-                      <p className="text-xs text-gray-500 truncate">{replyTo.text}</p>
+                      <p className="text-[13px] text-[#707579] truncate leading-tight">{replyTo.text}</p>
                     </div>
-                    <button onClick={() => setReplyTo(null)} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                    <button onClick={() => setReplyTo(null)} className="p-1 rounded-full text-[#707579] hover:text-[#3390ec] hover:bg-black/5 transition-colors">
                       <X className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
               )}
-              <div className="p-3 md:p-4 flex items-end gap-2">
-                <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                  placeholder="Type a message..."
-                  className="flex-1 h-11 px-4 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1E90FF] focus:ring-1 focus:ring-[#1E90FF]/30 transition-colors" />
-                <button onClick={handleSend} disabled={!input.trim() || !wsConnected}
-                  className="h-11 w-11 rounded-xl bg-gradient-to-r from-[#1E90FF] to-[#22C55E] text-white flex items-center justify-center hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none flex-shrink-0">
-                  <Send className="h-5 w-5" />
-                </button>
+              <div className="flex items-end gap-[6px]">
+                <div className="flex-1 flex items-end bg-white rounded-[21px] shadow-sm min-h-[42px]">
+                  <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
+                    placeholder="Message"
+                    className="flex-1 bg-transparent px-[14px] py-[9px] text-[15px] text-[#000000] placeholder:text-[#a2acb4] focus:outline-none leading-[22px]" />
+                </div>
+                {input.trim() ? (
+                  <button onClick={handleSend} disabled={!wsConnected}
+                    className="h-[42px] w-[42px] rounded-full bg-[#3390ec] text-white flex items-center justify-center hover:bg-[#2b7ed8] active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none flex-shrink-0 shadow-sm">
+                    <Send className="h-5 w-5 ml-[1px]" />
+                  </button>
+                ) : (
+                  <button className="h-[42px] w-[42px] rounded-full text-[#a2acb4] flex items-center justify-center hover:text-[#707579] transition-colors flex-shrink-0">
+                    <Smile className="h-[22px] w-[22px]" />
+                  </button>
+                )}
               </div>
             </div>
           </>

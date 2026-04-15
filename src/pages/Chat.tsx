@@ -307,32 +307,24 @@ export default function Chat() {
     setForwardMsg(null);
   };
 
-  const handleDelete = (msg: { id: string; isMe: boolean; deleteType: "me" | "everyone" }) => {
+  const handleDelete = (msg: { id: string; isMe: boolean }) => {
     if (!selectedUser) return;
     const userId = String(selectedUser.id);
 
-    if (msg.deleteType === "everyone") {
-      // Send delete via WebSocket for both users
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: "delete_message",
-          message_id: msg.id,
-        }));
-      }
-      // Update UI instantly
-      setMessagesByUser(prev => ({
-        ...prev,
-        [userId]: (prev[userId] || []).map(m =>
-          m.id === msg.id ? { ...m, deleted: true, text: "This message was deleted" } : m
-        ),
-      }));
-    } else {
-      // Delete for Me — remove from local state only, no WebSocket
-      setMessagesByUser(prev => ({
-        ...prev,
-        [userId]: (prev[userId] || []).filter(m => m.id !== msg.id),
+    // Send delete via WebSocket for both users
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "delete_message",
+        message_id: msg.id,
       }));
     }
+    // Update UI instantly
+    setMessagesByUser(prev => ({
+      ...prev,
+      [userId]: (prev[userId] || []).map(m =>
+        m.id === msg.id ? { ...m, deleted: true, text: "This message was deleted" } : m
+      ),
+    }));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

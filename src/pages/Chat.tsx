@@ -202,6 +202,26 @@ export default function Chat() {
           return;
         }
 
+        // Map reply_to sender: show "You" if it's the current user
+        let replyToData: { text: string; sender: string } | null = null;
+        if (data.reply_to) {
+          if (typeof data.reply_to === "object") {
+            replyToData = {
+              text: data.reply_to.text || "",
+              sender: String(data.reply_to.sender_id || data.reply_to.sender) === String(currentUserId)
+                ? "You"
+                : (data.reply_to.sender_name || data.reply_to.sender || ""),
+            };
+          } else {
+            replyToData = {
+              text: data.reply_to_text || "",
+              sender: String(data.reply_to_sender_id || data.reply_to_sender) === String(currentUserId)
+                ? "You"
+                : (data.reply_to_sender || ""),
+            };
+          }
+        }
+
         addMessage(senderId, {
           id: data.id || data.message_id || `ws-${Date.now()}`,
           text: data.message,
@@ -209,11 +229,7 @@ export default function Chat() {
           sender_id: data.sender_id,
           receiver_id: data.receiver_id,
           time: data.time || getCurrentTime(),
-          reply_to: data.reply_to
-            ? (typeof data.reply_to === "object"
-              ? data.reply_to
-              : { text: data.reply_to_text || "", sender: data.reply_to_sender || "" })
-            : null,
+          reply_to: replyToData,
         });
       } catch (err) {
         console.error("Failed to parse WebSocket message:", err);

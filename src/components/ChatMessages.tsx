@@ -262,8 +262,8 @@ export default function ChatMessages({
   });
 
   return (
-    <ScrollArea className="flex-1 bg-muted/30">
-      <div className="p-4 md:p-6 space-y-3 min-h-full flex flex-col justify-end">
+    <ScrollArea className="flex-1 bg-secondary/50">
+      <div className="px-4 md:px-[15%] py-3 min-h-full flex flex-col justify-end">
         {loading && (
           <div className="flex justify-center py-4">
             <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />

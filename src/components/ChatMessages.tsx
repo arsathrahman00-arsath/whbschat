@@ -237,15 +237,21 @@ export default function ChatMessages({
                 : "bg-card text-foreground shadow-sm"
           }`}
         >
-          {/* Reply quote */}
+          {/* Telegram-style reply quote */}
           {m.reply_to && !m.deleted && (
-            <div className={`mb-1 px-2 py-1 rounded border-l-2 text-xs ${
+            <div className={`mb-[5px] rounded-[4px] border-l-[3px] cursor-pointer overflow-hidden ${
               m.isMe
-                ? "bg-primary-foreground/10 border-primary-foreground/40 text-primary-foreground/80"
-                : "bg-muted/60 border-primary/40 text-muted-foreground"
+                ? "bg-[#ffffff1a] border-white/60"
+                : "bg-[#3390ec0d] border-[#3390ec]"
             }`}>
-              <p className="font-medium text-[10px] mb-0.5">{m.reply_to.sender}</p>
-              <p className="line-clamp-2">{m.reply_to.text}</p>
+              <div className="px-[7px] py-[4px]">
+                <p className={`text-[12px] font-semibold leading-tight ${
+                  m.isMe ? "text-white" : "text-[#3390ec]"
+                }`}>{m.reply_to.sender}</p>
+                <p className={`text-[12px] leading-tight line-clamp-1 mt-[1px] ${
+                  m.isMe ? "text-white/70" : "text-[#000000]/50"
+                }`}>{m.reply_to.text}</p>
+              </div>
             </div>
           )}
           <span className="break-words whitespace-pre-wrap">{m.text}</span>

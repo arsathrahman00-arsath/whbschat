@@ -318,16 +318,16 @@ export default function ChatMessages({
 
       {/* Delete confirmation */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40" onClick={() => setDeleteConfirm(null)}>
-          <div className="bg-white rounded-2xl p-5 w-72 shadow-xl" onClick={e => e.stopPropagation()}>
-            <p className="text-sm font-semibold text-gray-900 mb-4">Delete Message?</p>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-foreground/40" onClick={() => setDeleteConfirm(null)}>
+          <div className="bg-card rounded-2xl p-5 w-72 shadow-xl" onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-semibold text-foreground mb-4">Delete Message?</p>
             <div className="space-y-2">
               <button
                 onClick={() => {
                   if (onDelete && deleteConfirm.id) onDelete({ id: deleteConfirm.id, isMe: deleteConfirm.isMe, deleteType: "me" });
                   setDeleteConfirm(null);
                 }}
-                className="w-full py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
+                className="w-full py-2.5 text-sm text-foreground hover:bg-muted rounded-xl transition-colors"
               >
                 Delete for Me
               </button>
@@ -337,14 +337,14 @@ export default function ChatMessages({
                     if (onDelete && deleteConfirm.id) onDelete({ id: deleteConfirm.id, isMe: deleteConfirm.isMe, deleteType: "everyone" });
                     setDeleteConfirm(null);
                   }}
-                  className="w-full py-2.5 text-sm text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                  className="w-full py-2.5 text-sm text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
                 >
                   Delete for Everyone
                 </button>
               )}
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="w-full py-2.5 text-sm text-gray-400 hover:bg-gray-50 rounded-xl transition-colors"
+                className="w-full py-2.5 text-sm text-muted-foreground hover:bg-muted rounded-xl transition-colors"
               >
                 Cancel
               </button>

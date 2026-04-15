@@ -181,7 +181,26 @@ export default function Chat() {
           };
         }
 
-        if (isFromMe) return;
+        // For own messages: update temp ID with real DB ID, then skip adding duplicate
+        if (isFromMe) {
+          if (data.id) {
+            const receiverId = String(data.receiver_id);
+            setMessagesByUser(prev => {
+              const userMsgs = prev[receiverId];
+              if (!userMsgs) return prev;
+              // Find the most recent temp message and replace its ID with the real one
+              const updated = [...userMsgs];
+              for (let i = updated.length - 1; i >= 0; i--) {
+                if (updated[i].id.startsWith("sent-") && updated[i].text === data.message) {
+                  updated[i] = { ...updated[i], id: String(data.id) };
+                  break;
+                }
+              }
+              return { ...prev, [receiverId]: updated };
+            });
+          }
+          return;
+        }
 
         addMessage(senderId, {
           id: data.id || data.message_id || `ws-${Date.now()}`,

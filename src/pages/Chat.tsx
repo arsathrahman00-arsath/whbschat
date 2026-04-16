@@ -192,6 +192,11 @@ export default function Chat() {
           return;
         }
 
+        // Normalize reply_to: ensure it's never undefined
+        if (!data.reply_to) {
+          data.reply_to = null;
+        }
+
         // Handle chat_message (or default message type)
         const senderId = String(data.sender_id);
         const isFromMe = senderId === String(currentUserId);

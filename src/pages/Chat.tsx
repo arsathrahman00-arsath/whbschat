@@ -175,9 +175,17 @@ export default function Chat() {
         const senderId = String(data.sender_id);
         const isFromMe = senderId === String(currentUserId);
 
+        // Resolve sender name: prefer backend field, fallback to users list
+        const senderName =
+          data.sender_name ||
+          usersRef.current.find(u => String(u.id) === senderId)?.username ||
+          "User";
+
+        console.log("WS DATA:", data);
+        console.log("SENDER NAME:", senderName);
+
         // Show desktop notification for incoming messages when tab is inactive
         if (!isFromMe && data.type === "chat_message" && "Notification" in window && Notification.permission === "granted" && document.hidden) {
-          const senderName = data.sender_name || users.find(u => String(u.id) === senderId)?.username || "New Message";
           const notification = new Notification(senderName, {
             body: data.message,
             icon: "/logo.png",
@@ -188,14 +196,13 @@ export default function Chat() {
           };
         }
 
-        // For own messages: update temp ID with real DB ID, then skip adding duplicate
+        // For own messages: update temp ID with real DB ID, preserve reply_to
         if (isFromMe) {
           if (data.id) {
             const receiverId = String(data.receiver_id);
             setMessagesByUser(prev => {
               const userMsgs = prev[receiverId];
               if (!userMsgs) return prev;
-              // Find the most recent temp message and replace its ID with the real one
               const updated = [...userMsgs];
               for (let i = updated.length - 1; i >= 0; i--) {
                 if (updated[i].id.startsWith("sent-") && updated[i].text === data.message) {
@@ -209,17 +216,17 @@ export default function Chat() {
           return;
         }
 
-        // Map reply_to sender: show "You" if it's the current user, resolve username from users list
-        let replyToData: { text: string; sender: string } | null = null;
+        // Map reply_to using sender_id for identity, sender for display name
+        let replyToData: { text: string; sender: string; sender_id?: string | number } | null = null;
         if (data.reply_to) {
-
           if (typeof data.reply_to === "object") {
             const replySid = data.reply_to.sender_id;
             replyToData = {
               text: data.reply_to.text || "",
               sender: replySid
-                ? (String(replySid) === String(currentUserId) ? "You" : (data.reply_to.sender || "User"))
+                ? (String(replySid) === String(currentUserId) ? "You" : (data.reply_to.sender || senderName || "User"))
                 : (data.reply_to.sender || "User"),
+              sender_id: replySid,
             };
           } else {
             const replySid = data.reply_to_sender_id;
@@ -228,6 +235,7 @@ export default function Chat() {
               sender: replySid
                 ? (String(replySid) === String(currentUserId) ? "You" : (data.reply_to_sender || "User"))
                 : (data.reply_to_sender || "User"),
+              sender_id: replySid,
             };
           }
         }
@@ -237,6 +245,7 @@ export default function Chat() {
           text: data.message,
           sender: "other",
           sender_id: data.sender_id,
+          sender_name: senderName,
           receiver_id: data.receiver_id,
           time: data.time || getCurrentTime(),
           reply_to: replyToData,

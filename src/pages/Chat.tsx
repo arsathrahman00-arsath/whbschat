@@ -102,6 +102,7 @@ export default function Chat() {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const usersRef = useRef<ChatUser[]>([]);
   const messagesByUserRef = useRef<Record<string, Message[]>>({});
+  const selectedUserRef = useRef<ChatUser | null>(null);
 
   const setUsers = useCallback((list: ChatUser[]) => {
     usersRef.current = list;

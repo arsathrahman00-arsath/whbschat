@@ -102,6 +102,7 @@ export default function Chat() {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const usersRef = useRef<ChatUser[]>([]);
   const messagesByUserRef = useRef<Record<string, Message[]>>({});
+  const selectedUserRef = useRef<ChatUser | null>(null);
 
   const setUsers = useCallback((list: ChatUser[]) => {
     usersRef.current = list;
@@ -120,6 +121,7 @@ export default function Chat() {
 
   // Keep messagesByUserRef in sync
   useEffect(() => { messagesByUserRef.current = messagesByUser; }, [messagesByUser]);
+  useEffect(() => { selectedUserRef.current = selectedUser; }, [selectedUser]);
 
   const messages = selectedUser ? (messagesByUser[String(selectedUser.id)] || []) : [];
 
@@ -148,6 +150,11 @@ export default function Chat() {
       setWsConnected(true);
       // Notify backend that this user is now active
       ws.send(JSON.stringify({ type: "user_status", status: "Active" }));
+      // Re-request status for currently selected user on reconnect
+      const selUser = selectedUserRef.current;
+      if (selUser) {
+        ws.send(JSON.stringify({ type: "get_status", target_user_id: selUser.id }));
+      }
     };
 
     ws.onmessage = (event) => {
@@ -351,6 +358,7 @@ export default function Chat() {
     if (!input.trim() || !selectedUser) return;
 
     const msgPayload: any = {
+      type: "chat_message",
       sender_id: currentUserId,
       receiver_id: selectedUser.id,
       message: input.trim(),

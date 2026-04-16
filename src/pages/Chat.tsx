@@ -99,6 +99,7 @@ export default function Chat() {
   const [forwardMsg, setForwardMsg] = useState<{ text: string } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const usersRef = useRef<ChatUser[]>([]);
 
   const session = (() => {
     try {

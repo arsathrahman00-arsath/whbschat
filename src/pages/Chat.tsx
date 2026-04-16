@@ -158,12 +158,13 @@ export default function Chat() {
 
         // Handle message_deleted FIRST — before any sender checks
         if (data.type === "message_deleted") {
-          console.log("Processing message_deleted:", data.message_id);
+          const deletedId = String(data.message_id);
+          console.log("Processing message_deleted:", deletedId);
           setMessagesByUser(prev => {
             const updated: typeof prev = {};
             for (const key of Object.keys(prev)) {
               updated[key] = prev[key].map(m =>
-                m.id === data.message_id ? { ...m, deleted: true, text: "This message was deleted" } : m
+                String(m.id) === deletedId ? { ...m, deleted: true, text: "This message was deleted" } : m
               );
             }
             return updated;
@@ -199,18 +200,23 @@ export default function Chat() {
         // For own messages: update temp ID with real DB ID, preserve reply_to
         if (isFromMe) {
           if (data.id) {
+            const dbId = String(data.id);
             const receiverId = String(data.receiver_id);
             setMessagesByUser(prev => {
               const userMsgs = prev[receiverId];
               if (!userMsgs) return prev;
+              // Skip if real ID already exists (avoid duplicates)
+              if (userMsgs.some(m => m.id === dbId)) return prev;
               const updated = [...userMsgs];
+              let matched = false;
               for (let i = updated.length - 1; i >= 0; i--) {
-                if (updated[i].id.startsWith("sent-") && updated[i].text === data.message) {
-                  updated[i] = { ...updated[i], id: String(data.id) };
+                if (updated[i].id.startsWith("sent-") && updated[i].text === data.message && String(updated[i].receiver_id) === receiverId) {
+                  updated[i] = { ...updated[i], id: dbId };
+                  matched = true;
                   break;
                 }
               }
-              return { ...prev, [receiverId]: updated };
+              return matched ? { ...prev, [receiverId]: updated } : prev;
             });
           }
           return;
@@ -241,7 +247,7 @@ export default function Chat() {
         }
 
         addMessage(senderId, {
-          id: data.id || data.message_id || `ws-${Date.now()}`,
+          id: String(data.id || data.message_id || `ws-${Date.now()}`),
           text: data.message,
           sender: "other",
           sender_id: data.sender_id,
@@ -257,6 +263,7 @@ export default function Chat() {
 
     ws.onclose = () => {
       setWsConnected(false);
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
     };
 
@@ -374,10 +381,11 @@ export default function Chat() {
       }));
     }
     // Update UI instantly
+    const msgId = String(msg.id);
     setMessagesByUser(prev => ({
       ...prev,
       [userId]: (prev[userId] || []).map(m =>
-        m.id === msg.id ? { ...m, deleted: true, text: "This message was deleted" } : m
+        String(m.id) === msgId ? { ...m, deleted: true, text: "This message was deleted" } : m
       ),
     }));
   };

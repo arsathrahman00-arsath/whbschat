@@ -22,7 +22,7 @@ interface ChatMessage {
   time?: string;
   id?: string;
   deleted?: boolean;
-  reply_to?: { text: string; sender: string } | null;
+  reply_to?: { text: string; sender: string; sender_id?: string } | null;
 }
 
 interface ChatMessagesProps {
@@ -136,6 +136,12 @@ export default function ChatMessages({
   const unified: UnifiedMessage[] = [];
 
   apiMessages.forEach((msg, idx) => {
+    let mappedReply = msg.reply_to || null;
+    if (mappedReply) {
+      const replySenderId = mappedReply.sender_id || mappedReply.sender;
+      const replySenderName = String(replySenderId) === String(currentUserId) ? "You" : (mappedReply.sender || selectedUsername);
+      mappedReply = { text: mappedReply.text, sender: replySenderName };
+    }
     unified.push({
       key: msg.id || `api-${idx}`,
       id: msg.id || "",
@@ -144,7 +150,7 @@ export default function ChatMessages({
       time: formatTime(msg.created_at) || msg.time || "",
       dateSource: msg.created_at || msg.time,
       deleted: msg.deleted,
-      reply_to: msg.reply_to,
+      reply_to: mappedReply,
     });
   });
 

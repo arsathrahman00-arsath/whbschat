@@ -146,6 +146,8 @@ export default function Chat() {
     ws.onopen = () => {
       console.log("WebSocket connected");
       setWsConnected(true);
+      // Notify backend that this user is now active
+      ws.send(JSON.stringify({ type: "user_status", status: "Active" }));
     };
 
     ws.onmessage = (event) => {

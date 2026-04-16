@@ -211,12 +211,6 @@ export default function Chat() {
         // Map reply_to sender: show "You" if it's the current user, resolve username from users list
         let replyToData: { text: string; sender: string } | null = null;
         if (data.reply_to) {
-          const resolveReplyName = (sid: string | undefined, fallbackName: string | undefined) => {
-            if (!sid) return fallbackName || "";
-            if (String(sid) === String(currentUserId)) return "You";
-            const found = usersRef.current.find(u => String(u.id) === String(sid));
-            return found?.username || fallbackName || "";
-          };
 
           if (typeof data.reply_to === "object") {
             const replySid = data.reply_to.sender_id;

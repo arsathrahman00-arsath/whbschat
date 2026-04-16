@@ -12,7 +12,7 @@ export interface UnifiedMessage {
   time: string;
   dateSource: string | undefined;
   deleted?: boolean;
-  reply_to?: { text: string; sender: string } | null;
+  reply_to?: { text: string; sender: string; sender_id?: string | number } | null;
 }
 
 interface ChatMessage {

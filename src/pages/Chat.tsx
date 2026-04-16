@@ -358,6 +358,7 @@ export default function Chat() {
     if (!input.trim() || !selectedUser) return;
 
     const msgPayload: any = {
+      type: "chat_message",
       sender_id: currentUserId,
       receiver_id: selectedUser.id,
       message: input.trim(),

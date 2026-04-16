@@ -101,6 +101,11 @@ export default function Chat() {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const usersRef = useRef<ChatUser[]>([]);
 
+  const setUsers = useCallback((list: ChatUser[]) => {
+    usersRef.current = list;
+    setUsersState(list);
+  }, []);
+
   const session = (() => {
     try {
       return JSON.parse(sessionStorage.getItem("whchat_session") || "null");

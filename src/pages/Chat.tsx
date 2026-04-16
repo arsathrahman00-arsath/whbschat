@@ -101,6 +101,7 @@ export default function Chat() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const usersRef = useRef<ChatUser[]>([]);
+  const messagesByUserRef = useRef<Record<string, Message[]>>({});
 
   const setUsers = useCallback((list: ChatUser[]) => {
     usersRef.current = list;
@@ -116,6 +117,9 @@ export default function Chat() {
   })();
 
   const currentUserId = session?.userId || session?.id;
+
+  // Keep messagesByUserRef in sync
+  useEffect(() => { messagesByUserRef.current = messagesByUser; }, [messagesByUser]);
 
   const messages = selectedUser ? (messagesByUser[String(selectedUser.id)] || []) : [];
 
@@ -234,15 +238,35 @@ export default function Chat() {
                 : (data.reply_to.sender || "User"),
               sender_id: replySid,
             };
-          } else {
-            const replySid = data.reply_to_sender_id;
-            replyToData = {
-              text: data.reply_to_text || "",
-              sender: replySid
-                ? (String(replySid) === String(currentUserId) ? "You" : (data.reply_to_sender || "User"))
-                : (data.reply_to_sender || "User"),
-              sender_id: replySid,
-            };
+          } else if (typeof data.reply_to === "string" || typeof data.reply_to === "number") {
+            // reply_to is a message ID — look up from local state
+            const replyId = String(data.reply_to);
+            let foundMsg: Message | undefined;
+            const allUserKeys = Object.keys(messagesByUserRef.current);
+            for (const key of allUserKeys) {
+              foundMsg = messagesByUserRef.current[key]?.find(m => String(m.id) === replyId);
+              if (foundMsg) break;
+            }
+            if (foundMsg) {
+              const replySid = foundMsg.sender_id;
+              replyToData = {
+                text: foundMsg.deleted ? "This message was deleted" : foundMsg.text,
+                sender: replySid
+                  ? (String(replySid) === String(currentUserId) ? "You" : (foundMsg.sender_name || "User"))
+                  : (foundMsg.sender === "me" ? "You" : "User"),
+                sender_id: replySid,
+              };
+            } else if (data.reply_to_text) {
+              // Fallback to flat fields if present
+              const replySid = data.reply_to_sender_id;
+              replyToData = {
+                text: data.reply_to_text || "",
+                sender: replySid
+                  ? (String(replySid) === String(currentUserId) ? "You" : (data.reply_to_sender || "User"))
+                  : (data.reply_to_sender || "User"),
+                sender_id: replySid,
+              };
+            }
           }
         }
 

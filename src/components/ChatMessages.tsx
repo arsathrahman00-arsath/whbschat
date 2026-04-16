@@ -35,7 +35,7 @@ interface ChatMessagesProps {
     sender: "me" | "other";
     time?: string;
     deleted?: boolean;
-    reply_to?: { text: string; sender: string } | null;
+    reply_to?: { text: string; sender: string; sender_id?: string | number } | null;
   }[];
   onReply?: (msg: { id: string; text: string; isMe: boolean }) => void;
   onForward?: (msg: { text: string }) => void;

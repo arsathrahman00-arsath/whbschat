@@ -118,6 +118,9 @@ export default function Chat() {
 
   const currentUserId = session?.userId || session?.id;
 
+  // Keep messagesByUserRef in sync
+  useEffect(() => { messagesByUserRef.current = messagesByUser; }, [messagesByUser]);
+
   const messages = selectedUser ? (messagesByUser[String(selectedUser.id)] || []) : [];
 
   const addMessage = useCallback((userId: string | number, msg: Message) => {

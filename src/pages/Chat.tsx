@@ -85,7 +85,7 @@ const WS_BASE_URL = "wss://ngrchatbot.whindia.in/ws/chat";
 
 export default function Chat() {
   const navigate = useNavigate();
-  const [users, setUsers] = useState<ChatUser[]>([]);
+  const [users, setUsersState] = useState<ChatUser[]>([]);
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
   const [messagesByUser, setMessagesByUser] = useState<Record<string, Message[]>>({});
   const [userStatuses, setUserStatuses] = useState<Record<string, UserStatusInfo>>({});
@@ -99,6 +99,12 @@ export default function Chat() {
   const [forwardMsg, setForwardMsg] = useState<{ text: string } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const usersRef = useRef<ChatUser[]>([]);
+
+  const setUsers = useCallback((list: ChatUser[]) => {
+    usersRef.current = list;
+    setUsersState(list);
+  }, []);
 
   const session = (() => {
     try {
@@ -202,22 +208,26 @@ export default function Chat() {
           return;
         }
 
-        // Map reply_to sender: show "You" if it's the current user
+        // Map reply_to sender: show "You" if it's the current user, resolve username from users list
         let replyToData: { text: string; sender: string } | null = null;
         if (data.reply_to) {
+          const resolveReplyName = (sid: string | undefined, fallbackName: string | undefined) => {
+            if (!sid) return fallbackName || "";
+            if (String(sid) === String(currentUserId)) return "You";
+            const found = usersRef.current.find(u => String(u.id) === String(sid));
+            return found?.username || fallbackName || "";
+          };
+
           if (typeof data.reply_to === "object") {
+            const replySid = data.reply_to.sender_id || data.reply_to.sender;
             replyToData = {
               text: data.reply_to.text || "",
-              sender: String(data.reply_to.sender_id || data.reply_to.sender) === String(currentUserId)
-                ? "You"
-                : (data.reply_to.sender_name || data.reply_to.sender || ""),
+              sender: resolveReplyName(String(replySid), data.reply_to.sender_name || data.reply_to.sender),
             };
           } else {
             replyToData = {
               text: data.reply_to_text || "",
-              sender: String(data.reply_to_sender_id || data.reply_to_sender) === String(currentUserId)
-                ? "You"
-                : (data.reply_to_sender || ""),
+              sender: resolveReplyName(String(data.reply_to_sender_id), data.reply_to_sender),
             };
           }
         }

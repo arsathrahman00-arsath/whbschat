@@ -101,6 +101,7 @@ export default function Chat() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const usersRef = useRef<ChatUser[]>([]);
+  const messagesByUserRef = useRef<Record<string, Message[]>>({});
 
   const setUsers = useCallback((list: ChatUser[]) => {
     usersRef.current = list;

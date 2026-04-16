@@ -133,39 +133,51 @@ export default function ChatMessages({
     }
   };
 
-  const unified: UnifiedMessage[] = [];
+  // Build unified list: merge API + local, deduplicate by ID, local wins
+  const unified: UnifiedMessage[] = (() => {
+    const mergedMap = new Map<string, UnifiedMessage>();
 
-  apiMessages.forEach((msg, idx) => {
-    let mappedReply = msg.reply_to || null;
-    if (mappedReply) {
-      const replySenderId = mappedReply.sender_id || mappedReply.sender;
-      const replySenderName = String(replySenderId) === String(currentUserId) ? "You" : (mappedReply.sender || selectedUsername);
-      mappedReply = { text: mappedReply.text, sender: replySenderName };
-    }
-    unified.push({
-      key: msg.id || `api-${idx}`,
-      id: msg.id || "",
-      isMe: String(msg.sender_id) === String(currentUserId),
-      text: msg.deleted ? "This message was deleted" : msg.message,
-      time: formatTime(msg.created_at) || msg.time || "",
-      dateSource: msg.created_at || msg.time,
-      deleted: msg.deleted,
-      reply_to: mappedReply,
+    // First pass: API messages
+    apiMessages.forEach((msg, idx) => {
+      const key = msg.id ? String(msg.id) : `api-${idx}`;
+      let mappedReply = msg.reply_to || null;
+      if (mappedReply) {
+        const replySenderId = mappedReply.sender_id || mappedReply.sender;
+        const replySenderName = String(replySenderId) === String(currentUserId) ? "You" : (mappedReply.sender || selectedUsername);
+        mappedReply = { text: mappedReply.text, sender: replySenderName };
+      }
+      mergedMap.set(key, {
+        key,
+        id: msg.id || "",
+        isMe: String(msg.sender_id) === String(currentUserId),
+        text: msg.deleted ? "This message was deleted" : msg.message,
+        time: formatTime(msg.created_at) || msg.time || "",
+        dateSource: msg.created_at || msg.time,
+        deleted: msg.deleted,
+        reply_to: mappedReply,
+      });
     });
-  });
 
-  localMessages.forEach((msg) => {
-    unified.push({
-      key: msg.id,
-      id: msg.id,
-      isMe: msg.sender === "me",
-      text: msg.deleted ? "This message was deleted" : msg.text,
-      time: msg.time || "",
-      dateSource: msg.time,
-      deleted: msg.deleted,
-      reply_to: msg.reply_to,
+    // Second pass: local messages override or add
+    localMessages.forEach((msg) => {
+      const key = String(msg.id);
+      const existing = mergedMap.get(key);
+      // Local always wins (has latest state from WebSocket)
+      const entry: UnifiedMessage = {
+        key,
+        id: msg.id,
+        isMe: msg.sender === "me",
+        text: msg.deleted ? "This message was deleted" : msg.text,
+        time: msg.time || (existing?.time || ""),
+        dateSource: msg.time || (existing?.dateSource),
+        deleted: msg.deleted,
+        reply_to: msg.reply_to ?? (existing?.reply_to || null),
+      };
+      mergedMap.set(key, entry);
     });
-  });
+
+    return Array.from(mergedMap.values());
+  })();
 
   const allEmpty = unified.length === 0;
 

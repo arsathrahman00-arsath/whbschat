@@ -148,6 +148,11 @@ export default function Chat() {
       setWsConnected(true);
       // Notify backend that this user is now active
       ws.send(JSON.stringify({ type: "user_status", status: "Active" }));
+      // Re-request status for currently selected user on reconnect
+      const selUser = selectedUserRef.current;
+      if (selUser) {
+        ws.send(JSON.stringify({ type: "get_status", target_user_id: selUser.id }));
+      }
     };
 
     ws.onmessage = (event) => {

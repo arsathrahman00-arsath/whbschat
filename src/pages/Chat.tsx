@@ -165,8 +165,6 @@ export default function Chat() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log("WebSocket message received:", data);
-
         // Handle user_status messages
         if (data.type === "user_status") {
           setUserStatuses(prev => ({

@@ -180,7 +180,6 @@ export default function Chat() {
         // Handle message_deleted FIRST — before any sender checks
         if (data.type === "message_deleted") {
           const deletedId = String(data.message_id);
-          console.log("Processing message_deleted:", deletedId);
           setMessagesByUser(prev => {
             const updated: typeof prev = {};
             for (const key of Object.keys(prev)) {
@@ -202,9 +201,6 @@ export default function Chat() {
           data.sender_name ||
           usersRef.current.find(u => String(u.id) === senderId)?.username ||
           "User";
-
-        console.log("WS DATA:", data);
-        console.log("SENDER NAME:", senderName);
 
         // Show desktop notification for incoming messages when tab is inactive
         if (!isFromMe && data.type === "chat_message" && "Notification" in window && Notification.permission === "granted" && document.hidden) {
@@ -412,24 +408,24 @@ export default function Chat() {
   };
 
   const handleDelete = (msg: { id: string; isMe: boolean }) => {
-    if (!selectedUser) return;
-    const userId = String(selectedUser.id);
-
-    // Send delete via WebSocket for both users
+    // Send delete via WebSocket
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: "delete_message",
         message_id: msg.id,
       }));
     }
-    // Update UI instantly
+    // Optimistic UI: update ALL chats, not just selected
     const msgId = String(msg.id);
-    setMessagesByUser(prev => ({
-      ...prev,
-      [userId]: (prev[userId] || []).map(m =>
-        String(m.id) === msgId ? { ...m, deleted: true, text: "This message was deleted" } : m
-      ),
-    }));
+    setMessagesByUser(prev => {
+      const updated: typeof prev = {};
+      for (const key of Object.keys(prev)) {
+        updated[key] = prev[key].map(m =>
+          String(m.id) === msgId ? { ...m, deleted: true, text: "This message was deleted" } : m
+        );
+      }
+      return updated;
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

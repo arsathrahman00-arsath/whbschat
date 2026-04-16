@@ -24,10 +24,11 @@ interface Message {
   text: string;
   sender: "me" | "other";
   sender_id?: string | number;
+  sender_name?: string;
   receiver_id?: string | number;
   time?: string;
   deleted?: boolean;
-  reply_to?: { text: string; sender: string } | null;
+  reply_to?: { text: string; sender: string; sender_id?: string | number } | null;
 }
 
 interface ReplyTo {

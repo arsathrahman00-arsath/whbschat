@@ -334,6 +334,7 @@ export default function Chat() {
       text: input.trim(),
       sender: "me",
       sender_id: currentUserId,
+      sender_name: session?.username || "You",
       receiver_id: selectedUser.id,
       time: getCurrentTime(),
       reply_to: replyTo ? { text: replyTo.text, sender: replyTo.isMe ? "You" : selectedUser.username } : null,

@@ -148,13 +148,18 @@ export default function Chat() {
     ws.onopen = () => {
       console.log("WebSocket connected");
       setWsConnected(true);
-      // Notify backend that this user is now active
       ws.send(JSON.stringify({ type: "user_status", status: "Active" }));
-      // Re-request status for currently selected user on reconnect
       const selUser = selectedUserRef.current;
       if (selUser) {
         ws.send(JSON.stringify({ type: "get_status", target_user_id: selUser.id }));
       }
+      // Heartbeat to keep connection alive
+      const heartbeatInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "heartbeat" }));
+        }
+      }, 5000);
+      ws.addEventListener("close", () => clearInterval(heartbeatInterval));
     };
 
     ws.onmessage = (event) => {

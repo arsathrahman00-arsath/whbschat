@@ -373,7 +373,7 @@ export default function Chat() {
       sender_name: session?.username || "You",
       receiver_id: selectedUser.id,
       time: getCurrentTime(),
-      reply_to: replyTo ? { text: replyTo.text, sender: replyTo.isMe ? "You" : selectedUser.username } : null,
+      reply_to: replyTo ? { text: replyTo.text, sender: replyTo.isMe ? "You" : selectedUser.username, sender_id: replyTo.isMe ? currentUserId : selectedUser.id } : null,
     });
     setInput("");
     setReplyTo(null);

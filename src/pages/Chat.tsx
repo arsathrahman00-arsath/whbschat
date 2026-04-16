@@ -121,6 +121,7 @@ export default function Chat() {
 
   // Keep messagesByUserRef in sync
   useEffect(() => { messagesByUserRef.current = messagesByUser; }, [messagesByUser]);
+  useEffect(() => { selectedUserRef.current = selectedUser; }, [selectedUser]);
 
   const messages = selectedUser ? (messagesByUser[String(selectedUser.id)] || []) : [];
 

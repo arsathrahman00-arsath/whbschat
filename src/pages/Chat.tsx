@@ -85,7 +85,7 @@ const WS_BASE_URL = "wss://ngrchatbot.whindia.in/ws/chat";
 
 export default function Chat() {
   const navigate = useNavigate();
-  const [users, setUsers] = useState<ChatUser[]>([]);
+  const [users, setUsersState] = useState<ChatUser[]>([]);
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
   const [messagesByUser, setMessagesByUser] = useState<Record<string, Message[]>>({});
   const [userStatuses, setUserStatuses] = useState<Record<string, UserStatusInfo>>({});

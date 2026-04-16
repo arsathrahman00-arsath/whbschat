@@ -124,10 +124,15 @@ export default function Chat() {
   const messages = selectedUser ? (messagesByUser[String(selectedUser.id)] || []) : [];
 
   const addMessage = useCallback((userId: string | number, msg: Message) => {
-    setMessagesByUser(prev => ({
-      ...prev,
-      [String(userId)]: [...(prev[String(userId)] || []), msg],
-    }));
+    setMessagesByUser(prev => {
+      const key = String(userId);
+      const existing = prev[key] || [];
+      // Prevent duplicate by checking if message ID already exists
+      if (msg.id && !msg.id.startsWith("sent-") && existing.some(m => m.id === msg.id)) {
+        return prev;
+      }
+      return { ...prev, [key]: [...existing, msg] };
+    });
   }, []);
 
   const connectWebSocket = useCallback(() => {

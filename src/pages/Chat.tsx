@@ -219,15 +219,20 @@ export default function Chat() {
           };
 
           if (typeof data.reply_to === "object") {
-            const replySid = data.reply_to.sender_id || data.reply_to.sender;
+            const replySid = data.reply_to.sender_id;
             replyToData = {
               text: data.reply_to.text || "",
-              sender: resolveReplyName(String(replySid), data.reply_to.sender_name || data.reply_to.sender),
+              sender: replySid
+                ? (String(replySid) === String(currentUserId) ? "You" : (data.reply_to.sender || "User"))
+                : (data.reply_to.sender || "User"),
             };
           } else {
+            const replySid = data.reply_to_sender_id;
             replyToData = {
               text: data.reply_to_text || "",
-              sender: resolveReplyName(String(data.reply_to_sender_id), data.reply_to_sender),
+              sender: replySid
+                ? (String(replySid) === String(currentUserId) ? "You" : (data.reply_to_sender || "User"))
+                : (data.reply_to_sender || "User"),
             };
           }
         }

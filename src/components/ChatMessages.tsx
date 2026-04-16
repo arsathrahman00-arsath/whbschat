@@ -142,8 +142,10 @@ export default function ChatMessages({
       const key = msg.id ? String(msg.id) : `api-${idx}`;
       let mappedReply = msg.reply_to || null;
       if (mappedReply) {
-        const replySenderId = mappedReply.sender_id || mappedReply.sender;
-        const replySenderName = String(replySenderId) === String(currentUserId) ? "You" : (mappedReply.sender || selectedUsername);
+        const replySid = mappedReply.sender_id;
+        const replySenderName = replySid
+          ? (String(replySid) === String(currentUserId) ? "You" : (mappedReply.sender || "User"))
+          : (mappedReply.sender || "User");
         mappedReply = { text: mappedReply.text, sender: replySenderName };
       }
       mergedMap.set(key, {

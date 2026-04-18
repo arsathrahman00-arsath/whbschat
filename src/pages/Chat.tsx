@@ -392,6 +392,10 @@ export default function Chat() {
   };
 
   const handleSend = () => {
+    if (previewFile) {
+      sendFile(previewFile, input.trim());
+      return;
+    }
     if (!input.trim() || !selectedUser) return;
 
     const msgPayload: any = {
@@ -424,6 +428,138 @@ export default function Chat() {
     });
     setInput("");
     setReplyTo(null);
+  };
+
+  const updateLocalMessage = (userId: string, tempId: string, patch: Partial<Message>) => {
+    setMessagesByUser(prev => {
+      const list = prev[userId];
+      if (!list) return prev;
+      return {
+        ...prev,
+        [userId]: list.map(m => (m.id === tempId ? { ...m, ...patch } : m)),
+      };
+    });
+  };
+
+  const sendFile = async (file: File, caption: string) => {
+    if (!selectedUser) return;
+    const mediaType = detectMediaType(file);
+    const tempId = `sent-${Date.now()}`;
+    const localPreview = URL.createObjectURL(file);
+    const receiverKey = String(selectedUser.id);
+    const replySnapshot = replyTo;
+
+    // Optimistic message with local preview
+    addMessage(receiverKey, {
+      id: tempId,
+      text: caption,
+      sender: "me",
+      sender_id: currentUserId,
+      sender_name: session?.username || "You",
+      receiver_id: selectedUser.id,
+      time: getCurrentTime(),
+      reply_to: replySnapshot
+        ? { text: replySnapshot.text, sender: replySnapshot.isMe ? "You" : selectedUser.username, sender_id: replySnapshot.isMe ? currentUserId : selectedUser.id }
+        : null,
+      message_type: mediaType,
+      file_url: localPreview,
+      file_name: file.name,
+      file_size: file.size,
+      uploading: true,
+      progress: 0,
+    });
+
+    // Reset input UI immediately
+    setInput("");
+    setReplyTo(null);
+    setPreviewFile(null);
+    if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }
+    setIsUploading(true);
+
+    try {
+      const uploaded = await uploadFile(file, {
+        onProgress: (p) => updateLocalMessage(receiverKey, tempId, { progress: p }),
+      });
+
+      // Swap local blob URL with real URL, mark done
+      updateLocalMessage(receiverKey, tempId, {
+        uploading: false,
+        progress: 100,
+        file_url: uploaded.file_url,
+        file_name: uploaded.file_name,
+        file_size: uploaded.file_size,
+      });
+      URL.revokeObjectURL(localPreview);
+
+      // Send via WebSocket
+      const msgPayload: any = {
+        type: "chat_message",
+        sender_id: currentUserId,
+        receiver_id: selectedUser.id,
+        message: caption,
+        message_type: mediaType,
+        file_url: uploaded.file_url,
+        file_name: uploaded.file_name,
+        file_size: uploaded.file_size,
+      };
+      if (replySnapshot) msgPayload.reply_to = replySnapshot.id;
+
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify(msgPayload));
+      } else {
+        connectWebSocket();
+      }
+    } catch (err: any) {
+      console.error("Upload failed:", err);
+      toast.error(err?.message || "Upload failed");
+      // Mark message as failed by removing it
+      setMessagesByUser(prev => {
+        const list = prev[receiverKey];
+        if (!list) return prev;
+        return { ...prev, [receiverKey]: list.filter(m => m.id !== tempId) };
+      });
+      URL.revokeObjectURL(localPreview);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handlePickFile = (file: File | null) => {
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("File too large (max 50MB)");
+      return;
+    }
+    setPreviewFile(file);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const mt = detectMediaType(file);
+    setPreviewUrl(mt === "image" || mt === "video" ? URL.createObjectURL(file) : null);
+  };
+
+  const cancelPreview = () => {
+    setPreviewFile(null);
+    if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }
+  };
+
+  // Drag & drop handlers (chat area)
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!selectedUser) return;
+    e.preventDefault();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer.types.includes("Files")) setIsDragging(true);
+  };
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); };
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) { dragCounterRef.current = 0; setIsDragging(false); }
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handlePickFile(file);
   };
 
   const handleReply = (msg: { id: string; text: string; isMe: boolean }) => {

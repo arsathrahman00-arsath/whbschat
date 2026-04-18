@@ -238,16 +238,31 @@ export default function Chat() {
           if (data.id) {
             const dbId = String(data.id);
             const receiverId = String(data.receiver_id);
+            const incomingFileUrl = data.file_url || "";
+            const incomingMsg = data.message || "";
             setMessagesByUser(prev => {
               const userMsgs = prev[receiverId];
               if (!userMsgs) return prev;
-              // Skip if real ID already exists (avoid duplicates)
               if (userMsgs.some(m => m.id === dbId)) return prev;
               const updated = [...userMsgs];
               let matched = false;
               for (let i = updated.length - 1; i >= 0; i--) {
-                if (updated[i].id.startsWith("sent-") && updated[i].text === data.message && String(updated[i].receiver_id) === receiverId) {
-                  updated[i] = { ...updated[i], id: dbId };
+                const msg = updated[i];
+                if (!msg.id.startsWith("sent-")) continue;
+                if (String(msg.receiver_id) !== receiverId) continue;
+                const fileMatches = incomingFileUrl && msg.file_url === incomingFileUrl;
+                const textMatches = incomingMsg && msg.text === incomingMsg && (msg.message_type || "text") === "text";
+                if (fileMatches || textMatches) {
+                  updated[i] = {
+                    ...msg,
+                    id: dbId,
+                    uploading: false,
+                    progress: undefined,
+                    file_url: data.file_url || msg.file_url,
+                    file_name: data.file_name || msg.file_name,
+                    file_size: data.file_size ?? msg.file_size,
+                    message_type: data.message_type || msg.message_type,
+                  };
                   matched = true;
                   break;
                 }

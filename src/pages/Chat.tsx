@@ -106,6 +106,12 @@ export default function Chat() {
   const [chatId, setChatId] = useState<string | number | null>(null);
   const [replyTo, setReplyTo] = useState<ReplyTo | null>(null);
   const [forwardMsg, setForwardMsg] = useState<{ text: string } | null>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const dragCounterRef = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const usersRef = useRef<ChatUser[]>([]);

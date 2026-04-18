@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageCircle } from "lucide-react";
 import MessageContextMenu from "@/components/MessageContextMenu";
+import MediaMessage from "@/components/MediaMessage";
+import type { MediaType } from "@/lib/uploadFile";
 import { toast } from "sonner";
 
 export interface UnifiedMessage {
@@ -13,6 +15,12 @@ export interface UnifiedMessage {
   dateSource: string | undefined;
   deleted?: boolean;
   reply_to?: { text: string; sender: string; sender_id?: string | number } | null;
+  message_type?: MediaType | "text";
+  file_url?: string;
+  file_name?: string;
+  file_size?: number;
+  uploading?: boolean;
+  progress?: number;
 }
 
 interface ChatMessage {
@@ -23,6 +31,10 @@ interface ChatMessage {
   id?: string;
   deleted?: boolean;
   reply_to?: { text: string; sender: string; sender_id?: string } | null;
+  message_type?: MediaType | "text";
+  file_url?: string;
+  file_name?: string;
+  file_size?: number;
 }
 
 interface ChatMessagesProps {
@@ -36,6 +48,12 @@ interface ChatMessagesProps {
     time?: string;
     deleted?: boolean;
     reply_to?: { text: string; sender: string; sender_id?: string | number } | null;
+    message_type?: MediaType | "text";
+    file_url?: string;
+    file_name?: string;
+    file_size?: number;
+    uploading?: boolean;
+    progress?: number;
   }[];
   onReply?: (msg: { id: string; text: string; isMe: boolean }) => void;
   onForward?: (msg: { text: string }) => void;
@@ -157,6 +175,10 @@ export default function ChatMessages({
         dateSource: msg.created_at || msg.time,
         deleted: msg.deleted,
         reply_to: mappedReply,
+        message_type: msg.message_type || "text",
+        file_url: msg.file_url,
+        file_name: msg.file_name,
+        file_size: msg.file_size,
       });
     });
 
@@ -174,6 +196,12 @@ export default function ChatMessages({
         dateSource: msg.time || (existing?.dateSource),
         deleted: msg.deleted,
         reply_to: msg.reply_to ?? (existing?.reply_to || null),
+        message_type: msg.message_type || existing?.message_type || "text",
+        file_url: msg.file_url ?? existing?.file_url,
+        file_name: msg.file_name ?? existing?.file_name,
+        file_size: msg.file_size ?? existing?.file_size,
+        uploading: msg.uploading,
+        progress: msg.progress,
       };
       mergedMap.set(key, entry);
     });
@@ -239,6 +267,9 @@ export default function ChatMessages({
       }
     };
 
+    const isMedia = !m.deleted && m.message_type && m.message_type !== "text";
+    const hasCaption = isMedia && m.text && m.text.trim().length > 0;
+
     rendered.push(
       <div
         key={m.key}
@@ -249,17 +280,21 @@ export default function ChatMessages({
         onTouchMove={handleTouchEnd}
       >
         <div
-          className={`max-w-[65%] px-3 py-[6px] text-[14px] leading-[1.35] select-none ${getBubbleRadius()} ${
+          className={`max-w-[65%] text-[14px] leading-[1.35] select-none overflow-hidden ${getBubbleRadius()} ${
+            isMedia ? "p-[3px]" : "px-3 py-[6px]"
+          } ${
             m.deleted
-              ? "bg-muted/50 text-muted-foreground italic"
+              ? "bg-muted/50 text-muted-foreground italic px-3 py-[6px]"
               : m.isMe
                 ? "bg-primary text-primary-foreground"
                 : "bg-card text-foreground shadow-sm"
           }`}
         >
-          {/* Telegram-style reply quote */}
+          {/* Reply quote */}
           {m.reply_to && !m.deleted && (
             <div className={`mb-[5px] rounded-[4px] border-l-[3px] cursor-pointer overflow-hidden ${
+              isMedia ? "mx-[3px] mt-[3px]" : ""
+            } ${
               m.isMe
                 ? "bg-[#ffffff1a] border-white/60"
                 : "bg-[#3390ec0d] border-[#3390ec]"
@@ -274,10 +309,35 @@ export default function ChatMessages({
               </div>
             </div>
           )}
-          <span className="break-words whitespace-pre-wrap">{m.text}</span>
+
+          {/* Media body */}
+          {isMedia && (
+            <MediaMessage
+              message_type={m.message_type as MediaType}
+              file_url={m.file_url}
+              file_name={m.file_name}
+              file_size={m.file_size}
+              uploading={m.uploading}
+              progress={m.progress}
+              isMe={m.isMe}
+            />
+          )}
+
+          {/* Text / caption */}
+          {(!isMedia || hasCaption) && !m.deleted && m.text && (
+            <span className={`break-words whitespace-pre-wrap ${isMedia ? "block px-[9px] py-[6px]" : ""}`}>
+              {m.text}
+            </span>
+          )}
+          {m.deleted && (
+            <span className="break-words whitespace-pre-wrap">{m.text}</span>
+          )}
+
           {m.time && !m.deleted && (
-            <span className={`text-[11px] float-right mt-[2px] ml-3 leading-[1.6] ${
-              m.isMe ? "text-primary-foreground/50" : "text-muted-foreground/60"
+            <span className={`text-[11px] float-right leading-[1.6] ${
+              isMedia && !hasCaption ? "px-[9px] pb-[4px] mt-0" : "mt-[2px] ml-3"
+            } ${
+              m.isMe ? "text-primary-foreground/70" : "text-muted-foreground/60"
             }`}>
               {m.time}
             </span>

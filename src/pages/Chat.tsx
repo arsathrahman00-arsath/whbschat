@@ -2,11 +2,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, LogOut, Search, MessageCircle, WifiOff, X, Smile } from "lucide-react";
+import { Send, LogOut, Search, MessageCircle, WifiOff, X, Smile, Paperclip, FileText, Film } from "lucide-react";
 import logo from "@/assets/logo.jpg";
 import ChatMessages from "@/components/ChatMessages";
 import ForwardModal from "@/components/ForwardModal";
 import { generateChatId } from "@/lib/chatId";
+import { uploadFile, detectMediaType, formatFileSize, type MediaType } from "@/lib/uploadFile";
+import { toast } from "sonner";
 
 interface ChatUser {
   id: number | string;
@@ -29,6 +31,12 @@ interface Message {
   time?: string;
   deleted?: boolean;
   reply_to?: { text: string; sender: string; sender_id?: string | number } | null;
+  message_type?: MediaType | "text";
+  file_url?: string;
+  file_name?: string;
+  file_size?: number;
+  uploading?: boolean;
+  progress?: number;
 }
 
 interface ReplyTo {
@@ -98,6 +106,12 @@ export default function Chat() {
   const [chatId, setChatId] = useState<string | number | null>(null);
   const [replyTo, setReplyTo] = useState<ReplyTo | null>(null);
   const [forwardMsg, setForwardMsg] = useState<{ text: string } | null>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const dragCounterRef = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const usersRef = useRef<ChatUser[]>([]);
@@ -224,16 +238,31 @@ export default function Chat() {
           if (data.id) {
             const dbId = String(data.id);
             const receiverId = String(data.receiver_id);
+            const incomingFileUrl = data.file_url || "";
+            const incomingMsg = data.message || "";
             setMessagesByUser(prev => {
               const userMsgs = prev[receiverId];
               if (!userMsgs) return prev;
-              // Skip if real ID already exists (avoid duplicates)
               if (userMsgs.some(m => m.id === dbId)) return prev;
               const updated = [...userMsgs];
               let matched = false;
               for (let i = updated.length - 1; i >= 0; i--) {
-                if (updated[i].id.startsWith("sent-") && updated[i].text === data.message && String(updated[i].receiver_id) === receiverId) {
-                  updated[i] = { ...updated[i], id: dbId };
+                const msg = updated[i];
+                if (!msg.id.startsWith("sent-")) continue;
+                if (String(msg.receiver_id) !== receiverId) continue;
+                const fileMatches = incomingFileUrl && msg.file_url === incomingFileUrl;
+                const textMatches = incomingMsg && msg.text === incomingMsg && (msg.message_type || "text") === "text";
+                if (fileMatches || textMatches) {
+                  updated[i] = {
+                    ...msg,
+                    id: dbId,
+                    uploading: false,
+                    progress: undefined,
+                    file_url: data.file_url || msg.file_url,
+                    file_name: data.file_name || msg.file_name,
+                    file_size: data.file_size ?? msg.file_size,
+                    message_type: data.message_type || msg.message_type,
+                  };
                   matched = true;
                   break;
                 }
@@ -290,13 +319,17 @@ export default function Chat() {
 
         addMessage(senderId, {
           id: String(data.id || data.message_id || `ws-${Date.now()}`),
-          text: data.message,
+          text: data.message || "",
           sender: "other",
           sender_id: data.sender_id,
           sender_name: senderName,
           receiver_id: data.receiver_id,
           time: data.time || getCurrentTime(),
           reply_to: replyToData,
+          message_type: data.message_type || "text",
+          file_url: data.file_url,
+          file_name: data.file_name,
+          file_size: data.file_size,
         });
       } catch (err) {
         console.error("Failed to parse WebSocket message:", err);
@@ -359,6 +392,10 @@ export default function Chat() {
   };
 
   const handleSend = () => {
+    if (previewFile) {
+      sendFile(previewFile, input.trim());
+      return;
+    }
     if (!input.trim() || !selectedUser) return;
 
     const msgPayload: any = {
@@ -391,6 +428,138 @@ export default function Chat() {
     });
     setInput("");
     setReplyTo(null);
+  };
+
+  const updateLocalMessage = (userId: string, tempId: string, patch: Partial<Message>) => {
+    setMessagesByUser(prev => {
+      const list = prev[userId];
+      if (!list) return prev;
+      return {
+        ...prev,
+        [userId]: list.map(m => (m.id === tempId ? { ...m, ...patch } : m)),
+      };
+    });
+  };
+
+  const sendFile = async (file: File, caption: string) => {
+    if (!selectedUser) return;
+    const mediaType = detectMediaType(file);
+    const tempId = `sent-${Date.now()}`;
+    const localPreview = URL.createObjectURL(file);
+    const receiverKey = String(selectedUser.id);
+    const replySnapshot = replyTo;
+
+    // Optimistic message with local preview
+    addMessage(receiverKey, {
+      id: tempId,
+      text: caption,
+      sender: "me",
+      sender_id: currentUserId,
+      sender_name: session?.username || "You",
+      receiver_id: selectedUser.id,
+      time: getCurrentTime(),
+      reply_to: replySnapshot
+        ? { text: replySnapshot.text, sender: replySnapshot.isMe ? "You" : selectedUser.username, sender_id: replySnapshot.isMe ? currentUserId : selectedUser.id }
+        : null,
+      message_type: mediaType,
+      file_url: localPreview,
+      file_name: file.name,
+      file_size: file.size,
+      uploading: true,
+      progress: 0,
+    });
+
+    // Reset input UI immediately
+    setInput("");
+    setReplyTo(null);
+    setPreviewFile(null);
+    if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }
+    setIsUploading(true);
+
+    try {
+      const uploaded = await uploadFile(file, {
+        onProgress: (p) => updateLocalMessage(receiverKey, tempId, { progress: p }),
+      });
+
+      // Swap local blob URL with real URL, mark done
+      updateLocalMessage(receiverKey, tempId, {
+        uploading: false,
+        progress: 100,
+        file_url: uploaded.file_url,
+        file_name: uploaded.file_name,
+        file_size: uploaded.file_size,
+      });
+      URL.revokeObjectURL(localPreview);
+
+      // Send via WebSocket
+      const msgPayload: any = {
+        type: "chat_message",
+        sender_id: currentUserId,
+        receiver_id: selectedUser.id,
+        message: caption,
+        message_type: mediaType,
+        file_url: uploaded.file_url,
+        file_name: uploaded.file_name,
+        file_size: uploaded.file_size,
+      };
+      if (replySnapshot) msgPayload.reply_to = replySnapshot.id;
+
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify(msgPayload));
+      } else {
+        connectWebSocket();
+      }
+    } catch (err: any) {
+      console.error("Upload failed:", err);
+      toast.error(err?.message || "Upload failed");
+      // Mark message as failed by removing it
+      setMessagesByUser(prev => {
+        const list = prev[receiverKey];
+        if (!list) return prev;
+        return { ...prev, [receiverKey]: list.filter(m => m.id !== tempId) };
+      });
+      URL.revokeObjectURL(localPreview);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handlePickFile = (file: File | null) => {
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("File too large (max 50MB)");
+      return;
+    }
+    setPreviewFile(file);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const mt = detectMediaType(file);
+    setPreviewUrl(mt === "image" || mt === "video" ? URL.createObjectURL(file) : null);
+  };
+
+  const cancelPreview = () => {
+    setPreviewFile(null);
+    if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }
+  };
+
+  // Drag & drop handlers (chat area)
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!selectedUser) return;
+    e.preventDefault();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer.types.includes("Files")) setIsDragging(true);
+  };
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); };
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) { dragCounterRef.current = 0; setIsDragging(false); }
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handlePickFile(file);
   };
 
   const handleReply = (msg: { id: string; text: string; isMe: boolean }) => {
@@ -535,7 +704,23 @@ export default function Chat() {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div
+        className="flex-1 flex flex-col min-w-0 relative"
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {/* Drag overlay */}
+        {isDragging && selectedUser && (
+          <div className="absolute inset-0 z-50 bg-[#3390ec]/10 border-4 border-dashed border-[#3390ec] flex items-center justify-center pointer-events-none animate-fade-in">
+            <div className="bg-white rounded-2xl px-6 py-4 shadow-lg flex items-center gap-3">
+              <Paperclip className="h-6 w-6 text-[#3390ec]" />
+              <p className="text-base font-semibold text-[#3390ec]">Drop file to send</p>
+            </div>
+          </div>
+        )}
+
         {selectedUser ? (
           <>
             <div className="h-16 px-4 md:px-6 flex items-center gap-3 border-b border-gray-200 bg-white">
@@ -585,14 +770,63 @@ export default function Chat() {
                   </div>
                 </div>
               )}
+
+              {/* File preview before send */}
+              {previewFile && (
+                <div className="mb-[5px]">
+                  <div className="flex items-center gap-3 px-3 py-[8px] rounded-xl bg-white/90 border border-gray-200 shadow-sm animate-fade-in">
+                    {previewUrl && detectMediaType(previewFile) === "image" ? (
+                      <img src={previewUrl} alt={previewFile.name} className="h-12 w-12 rounded-lg object-cover flex-shrink-0" />
+                    ) : previewUrl && detectMediaType(previewFile) === "video" ? (
+                      <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-black flex-shrink-0">
+                        <video src={previewUrl} className="h-full w-full object-cover" muted />
+                        <Film className="absolute inset-0 m-auto h-5 w-5 text-white drop-shadow" />
+                      </div>
+                    ) : (
+                      <div className="h-12 w-12 rounded-lg bg-[#3390ec]/10 flex items-center justify-center flex-shrink-0">
+                        <FileText className="h-6 w-6 text-[#3390ec]" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-gray-900 truncate">{previewFile.name}</p>
+                      <p className="text-[12px] text-[#707579]">{formatFileSize(previewFile.size)}</p>
+                    </div>
+                    <button onClick={cancelPreview} disabled={isUploading}
+                      className="p-1 rounded-full text-[#707579] hover:text-destructive hover:bg-black/5 transition-colors disabled:opacity-40">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-end gap-[6px]">
+                {/* Attach button */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt"
+                  onChange={(e) => {
+                    handlePickFile(e.target.files?.[0] || null);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="h-[42px] w-[42px] rounded-full text-[#707579] hover:text-[#3390ec] hover:bg-white/60 transition-colors flex items-center justify-center flex-shrink-0 disabled:opacity-40"
+                  title="Attach file"
+                >
+                  <Paperclip className="h-[22px] w-[22px]" />
+                </button>
+
                 <div className="flex-1 flex items-end bg-white rounded-[21px] shadow-sm min-h-[42px]">
                   <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                    placeholder="Message"
+                    placeholder={previewFile ? "Add a caption…" : "Message"}
                     className="flex-1 bg-transparent px-[14px] py-[9px] text-[15px] text-[#000000] placeholder:text-[#a2acb4] focus:outline-none leading-[22px]" />
                 </div>
-                {input.trim() ? (
-                  <button onClick={handleSend} disabled={!wsConnected}
+                {(input.trim() || previewFile) ? (
+                  <button onClick={handleSend} disabled={!wsConnected || isUploading}
                     className="h-[42px] w-[42px] rounded-full bg-[#3390ec] text-white flex items-center justify-center hover:bg-[#2b7ed8] active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none flex-shrink-0 shadow-sm">
                     <Send className="h-5 w-5 ml-[1px]" />
                   </button>

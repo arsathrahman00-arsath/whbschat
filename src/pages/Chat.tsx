@@ -2,11 +2,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, LogOut, Search, MessageCircle, WifiOff, X, Smile } from "lucide-react";
+import { Send, LogOut, Search, MessageCircle, WifiOff, X, Smile, Paperclip, FileText, Film, Image as ImageIcon } from "lucide-react";
 import logo from "@/assets/logo.jpg";
 import ChatMessages from "@/components/ChatMessages";
 import ForwardModal from "@/components/ForwardModal";
 import { generateChatId } from "@/lib/chatId";
+import { uploadFile, detectMediaType, formatFileSize, type MediaType } from "@/lib/uploadFile";
+import { toast } from "sonner";
 
 interface ChatUser {
   id: number | string;
@@ -29,6 +31,12 @@ interface Message {
   time?: string;
   deleted?: boolean;
   reply_to?: { text: string; sender: string; sender_id?: string | number } | null;
+  message_type?: MediaType | "text";
+  file_url?: string;
+  file_name?: string;
+  file_size?: number;
+  uploading?: boolean;
+  progress?: number;
 }
 
 interface ReplyTo {

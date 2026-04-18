@@ -7,7 +7,15 @@ import logo from "@/assets/logo.jpg";
 import ChatMessages from "@/components/ChatMessages";
 import ForwardModal from "@/components/ForwardModal";
 import { generateChatId } from "@/lib/chatId";
-import { uploadFile, detectMediaType, formatFileSize, type MediaType } from "@/lib/uploadFile";
+import {
+  mapToChatMessage,
+  formatFileSize,
+  kindFromMime,
+  type ChatMessage,
+  type ChatAttachment,
+} from "@/lib/chatMessage";
+import { uploadAttachment } from "@/lib/uploadAttachment";
+import { sendChatMessage } from "@/lib/wsSend";
 import { toast } from "sonner";
 
 interface ChatUser {
@@ -21,29 +29,13 @@ interface UserStatusInfo {
   last_seen: string | null;
 }
 
-interface Message {
-  id: string;
-  text: string;
-  sender: "me" | "other";
-  sender_id?: string | number;
-  sender_name?: string;
-  receiver_id?: string | number;
-  time?: string;
-  deleted?: boolean;
-  reply_to?: { text: string; sender: string; sender_id?: string | number } | null;
-  message_type?: MediaType | "text";
-  file_url?: string;
-  file_name?: string;
-  file_size?: number;
-  uploading?: boolean;
-  progress?: number;
-}
-
 interface ReplyTo {
   id: string;
   text: string;
   isMe: boolean;
 }
+
+const WS_BASE_URL = "wss://ngrchatbot.whindia.in/ws/chat";
 
 function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase();
@@ -60,10 +52,6 @@ function getAvatarColor(name: string) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
-}
-
-function getCurrentTime(): string {
-  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
 }
 
 function formatLastSeen(lastSeen: string | null): string {
@@ -90,13 +78,12 @@ function formatStatusDisplay(info: UserStatusInfo | undefined): { text: string; 
   return { text: formatLastSeen(info.last_seen), isActive: false };
 }
 
-const WS_BASE_URL = "wss://ngrchatbot.whindia.in/ws/chat";
-
 export default function Chat() {
   const navigate = useNavigate();
   const [users, setUsersState] = useState<ChatUser[]>([]);
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
-  const [messagesByUser, setMessagesByUser] = useState<Record<string, Message[]>>({});
+  // Conversation key = peer userId (string). Stored as ChatMessage[] (live + optimistic).
+  const [messagesByUser, setMessagesByUser] = useState<Record<string, ChatMessage[]>>({});
   const [userStatuses, setUserStatuses] = useState<Record<string, UserStatusInfo>>({});
   const [input, setInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -115,7 +102,7 @@ export default function Chat() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const usersRef = useRef<ChatUser[]>([]);
-  const messagesByUserRef = useRef<Record<string, Message[]>>({});
+  const messagesByUserRef = useRef<Record<string, ChatMessage[]>>({});
   const selectedUserRef = useRef<ChatUser | null>(null);
 
   const setUsers = useCallback((list: ChatUser[]) => {
@@ -133,21 +120,37 @@ export default function Chat() {
 
   const currentUserId = session?.userId || session?.id;
 
-  // Keep messagesByUserRef in sync
   useEffect(() => { messagesByUserRef.current = messagesByUser; }, [messagesByUser]);
   useEffect(() => { selectedUserRef.current = selectedUser; }, [selectedUser]);
 
   const messages = selectedUser ? (messagesByUser[String(selectedUser.id)] || []) : [];
 
-  const addMessage = useCallback((userId: string | number, msg: Message) => {
+  /** Append a normalized message to a conversation, dedup by id. */
+  const appendMessage = useCallback((peerId: string | number, msg: ChatMessage) => {
     setMessagesByUser(prev => {
-      const key = String(userId);
+      const key = String(peerId);
       const existing = prev[key] || [];
-      // Prevent duplicate by checking if message ID already exists
-      if (msg.id && !msg.id.startsWith("sent-") && existing.some(m => m.id === msg.id)) {
-        return prev;
-      }
+      if (existing.some(m => m.id === msg.id)) return prev;
       return { ...prev, [key]: [...existing, msg] };
+    });
+  }, []);
+
+  /** Patch an existing message (e.g. swap temp id → real id). */
+  const patchMessage = useCallback((peerId: string | number, msgId: string, patch: Partial<ChatMessage>) => {
+    setMessagesByUser(prev => {
+      const key = String(peerId);
+      const list = prev[key];
+      if (!list) return prev;
+      return { ...prev, [key]: list.map(m => (m.id === msgId ? { ...m, ...patch } : m)) };
+    });
+  }, []);
+
+  const removeMessage = useCallback((peerId: string | number, msgId: string) => {
+    setMessagesByUser(prev => {
+      const key = String(peerId);
+      const list = prev[key];
+      if (!list) return prev;
+      return { ...prev, [key]: list.filter(m => m.id !== msgId) };
     });
   }, []);
 
@@ -155,31 +158,24 @@ export default function Chat() {
     if (!currentUserId) return;
     if (wsRef.current) wsRef.current.close();
 
-    const wsUrl = `${WS_BASE_URL}/${currentUserId}/`;
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(`${WS_BASE_URL}/${currentUserId}/`);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log("WebSocket connected");
       setWsConnected(true);
       ws.send(JSON.stringify({ type: "user_status", status: "Active" }));
       const selUser = selectedUserRef.current;
-      if (selUser) {
-        ws.send(JSON.stringify({ type: "get_status", target_user_id: selUser.id }));
-      }
-      // Heartbeat to keep connection alive
-      const heartbeatInterval = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "heartbeat" }));
-        }
+      if (selUser) ws.send(JSON.stringify({ type: "get_status", target_user_id: selUser.id }));
+      const heartbeat = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "heartbeat" }));
       }, 5000);
-      ws.addEventListener("close", () => clearInterval(heartbeatInterval));
+      ws.addEventListener("close", () => clearInterval(heartbeat));
     };
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        // Handle user_status messages
+
         if (data.type === "user_status") {
           setUserStatuses(prev => ({
             ...prev,
@@ -191,14 +187,13 @@ export default function Chat() {
           return;
         }
 
-        // Handle message_deleted FIRST — before any sender checks
         if (data.type === "message_deleted") {
           const deletedId = String(data.message_id);
           setMessagesByUser(prev => {
             const updated: typeof prev = {};
             for (const key of Object.keys(prev)) {
               updated[key] = prev[key].map(m =>
-                String(m.id) === deletedId ? { ...m, deleted: true, text: "This message was deleted" } : m
+                m.id === deletedId ? { ...m, deleted: true, message: "This message was deleted" } : m,
               );
             }
             return updated;
@@ -206,131 +201,54 @@ export default function Chat() {
           return;
         }
 
-        // Normalize reply_to: ensure it's never undefined
-        if (!data.reply_to) {
-          data.reply_to = null;
+        if (data.type !== "chat_message") return;
+
+        const senderId = String(data.sender_id);
+        const receiverId = String(data.receiver_id);
+        const isFromMe = senderId === String(currentUserId);
+        // Conversation key is the peer (the other user)
+        const peerKey = isFromMe ? receiverId : senderId;
+
+        const incoming = mapToChatMessage(data, currentUserId);
+
+        if (isFromMe) {
+          // Reconcile with optimistic temp message: match by file.id or text
+          setMessagesByUser(prev => {
+            const list = prev[peerKey];
+            if (!list) return { ...prev, [peerKey]: [incoming] };
+            if (list.some(m => m.id === incoming.id)) return prev;
+
+            const idx = (() => {
+              for (let i = list.length - 1; i >= 0; i--) {
+                const m = list[i];
+                if (!m.id.startsWith("tmp-")) continue;
+                if (incoming.file && m.file && m.file.id && incoming.file.id === m.file.id) return i;
+                if (!incoming.file && !m.file && incoming.message && m.message === incoming.message) return i;
+              }
+              return -1;
+            })();
+
+            if (idx === -1) return { ...prev, [peerKey]: [...list, incoming] };
+            const next = [...list];
+            next[idx] = { ...next[idx], ...incoming, uploading: false, upload_error: null };
+            return { ...prev, [peerKey]: next };
+          });
+          return;
         }
 
-        // Handle chat_message (or default message type)
-        const senderId = String(data.sender_id);
-        const isFromMe = senderId === String(currentUserId);
-
-        // Resolve sender name: prefer backend field, fallback to users list
+        // Incoming from peer
         const senderName =
           data.sender_name ||
           usersRef.current.find(u => String(u.id) === senderId)?.username ||
           "User";
 
-        // Show desktop notification for incoming messages when tab is inactive
-        if (!isFromMe && data.type === "chat_message" && "Notification" in window && Notification.permission === "granted" && document.hidden) {
-          const notification = new Notification(senderName, {
-            body: data.message,
-            icon: "/logo.png",
-          });
-          notification.onclick = () => {
-            window.focus();
-            notification.close();
-          };
+        if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
+          const body = incoming.message || (incoming.file ? `📎 ${incoming.file.name}` : "");
+          const n = new Notification(senderName, { body, icon: "/logo.png" });
+          n.onclick = () => { window.focus(); n.close(); };
         }
 
-        // For own messages: update temp ID with real DB ID, preserve reply_to
-        if (isFromMe) {
-          if (data.id) {
-            const dbId = String(data.id);
-            const receiverId = String(data.receiver_id);
-            const incomingFileUrl = data.file_url || "";
-            const incomingMsg = data.message || "";
-            setMessagesByUser(prev => {
-              const userMsgs = prev[receiverId];
-              if (!userMsgs) return prev;
-              if (userMsgs.some(m => m.id === dbId)) return prev;
-              const updated = [...userMsgs];
-              let matched = false;
-              for (let i = updated.length - 1; i >= 0; i--) {
-                const msg = updated[i];
-                if (!msg.id.startsWith("sent-")) continue;
-                if (String(msg.receiver_id) !== receiverId) continue;
-                const fileMatches = incomingFileUrl && msg.file_url === incomingFileUrl;
-                const textMatches = incomingMsg && msg.text === incomingMsg && (msg.message_type || "text") === "text";
-                if (fileMatches || textMatches) {
-                  updated[i] = {
-                    ...msg,
-                    id: dbId,
-                    uploading: false,
-                    progress: undefined,
-                    file_url: data.file_url || msg.file_url,
-                    file_name: data.file_name || msg.file_name,
-                    file_size: data.file_size ?? msg.file_size,
-                    message_type: data.message_type || msg.message_type,
-                  };
-                  matched = true;
-                  break;
-                }
-              }
-              return matched ? { ...prev, [receiverId]: updated } : prev;
-            });
-          }
-          return;
-        }
-
-        // Map reply_to using sender_id for identity, sender for display name
-        let replyToData: { text: string; sender: string; sender_id?: string | number } | null = null;
-        if (data.reply_to) {
-          if (typeof data.reply_to === "object") {
-            const replySid = data.reply_to.sender_id;
-            replyToData = {
-              text: data.reply_to.text || "",
-              sender: replySid
-                ? (String(replySid) === String(currentUserId) ? "You" : (data.reply_to.sender || senderName || "User"))
-                : (data.reply_to.sender || "User"),
-              sender_id: replySid,
-            };
-          } else if (typeof data.reply_to === "string" || typeof data.reply_to === "number") {
-            // reply_to is a message ID — look up from local state
-            const replyId = String(data.reply_to);
-            let foundMsg: Message | undefined;
-            const allUserKeys = Object.keys(messagesByUserRef.current);
-            for (const key of allUserKeys) {
-              foundMsg = messagesByUserRef.current[key]?.find(m => String(m.id) === replyId);
-              if (foundMsg) break;
-            }
-            if (foundMsg) {
-              const replySid = foundMsg.sender_id;
-              replyToData = {
-                text: foundMsg.deleted ? "This message was deleted" : foundMsg.text,
-                sender: replySid
-                  ? (String(replySid) === String(currentUserId) ? "You" : (foundMsg.sender_name || "User"))
-                  : (foundMsg.sender === "me" ? "You" : "User"),
-                sender_id: replySid,
-              };
-            } else if (data.reply_to_text) {
-              // Fallback to flat fields if present
-              const replySid = data.reply_to_sender_id;
-              replyToData = {
-                text: data.reply_to_text || "",
-                sender: replySid
-                  ? (String(replySid) === String(currentUserId) ? "You" : (data.reply_to_sender || "User"))
-                  : (data.reply_to_sender || "User"),
-                sender_id: replySid,
-              };
-            }
-          }
-        }
-
-        addMessage(senderId, {
-          id: String(data.id || data.message_id || `ws-${Date.now()}`),
-          text: data.message || "",
-          sender: "other",
-          sender_id: data.sender_id,
-          sender_name: senderName,
-          receiver_id: data.receiver_id,
-          time: data.time || getCurrentTime(),
-          reply_to: replyToData,
-          message_type: data.message_type || "text",
-          file_url: data.file_url,
-          file_name: data.file_name,
-          file_size: data.file_size,
-        });
+        appendMessage(peerKey, incoming);
       } catch (err) {
         console.error("Failed to parse WebSocket message:", err);
       }
@@ -343,30 +261,28 @@ export default function Chat() {
     };
 
     ws.onerror = (err) => console.error("WebSocket error:", err);
-  }, [currentUserId, addMessage]);
+  }, [currentUserId, appendMessage]);
 
   useEffect(() => {
     if (!session) { navigate("/login"); return; }
     fetchUsers();
     connectWebSocket();
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
     return () => {
       if (wsRef.current) wsRef.current.close();
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSelectUser = (user: ChatUser) => {
     setSelectedUser(user);
     setSidebarOpen(false);
-    const id = generateChatId(currentUserId, user.id);
-    setChatId(id);
-
-    // Request user status from backend via WebSocket
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: "get_status",
-        target_user_id: user.id,
-      }));
+    setChatId(generateChatId(currentUserId, user.id));
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "get_status", target_user_id: user.id }));
     }
   };
 
@@ -391,149 +307,106 @@ export default function Chat() {
     }
   };
 
-  const handleSend = () => {
-    if (previewFile) {
-      sendFile(previewFile, input.trim());
-      return;
-    }
-    if (!input.trim() || !selectedUser) return;
+  /**
+   * Send flow:
+   *   1. If a file is staged, upload it first → get { file_id, url, ... }
+   *   2. Then send a single WebSocket chat_message with { sender_id, receiver_id, message, file_id }
+   * Optimistic UI: a tmp message is inserted immediately, then reconciled
+   * with the server's broadcast via file.id (or text).
+   */
+  const handleSend = async () => {
+    if (!selectedUser) return;
+    const text = input.trim();
+    const file = previewFile;
 
-    const msgPayload: any = {
-      type: "chat_message",
-      sender_id: currentUserId,
-      receiver_id: selectedUser.id,
-      message: input.trim(),
+    if (!text && !file) return;
+    if (isUploading) return;
+
+    const peerId = selectedUser.id;
+    const peerKey = String(peerId);
+    const replySnapshot = replyTo;
+    const tmpId = `tmp-${Date.now()}`;
+    const localUrl = file ? URL.createObjectURL(file) : null;
+
+    // Build optimistic ChatMessage
+    const optimistic: ChatMessage = {
+      id: tmpId,
+      sender_id: String(currentUserId),
+      receiver_id: String(peerId),
+      message: text || null,
+      deleted: false,
+      created_at: new Date().toISOString(),
+      reply_to: replySnapshot
+        ? {
+            id: replySnapshot.id,
+            text: replySnapshot.text,
+            sender: replySnapshot.isMe ? "You" : selectedUser.username,
+            sender_id: replySnapshot.isMe ? String(currentUserId) : String(selectedUser.id),
+          }
+        : null,
+      file: file
+        ? {
+            id: "",
+            name: file.name,
+            mime_type: file.type,
+            size: file.size,
+            message_type: kindFromMime(file.type),
+            url: localUrl || "",
+          }
+        : null,
+      uploading: !!file,
     };
 
-    if (replyTo) {
-      msgPayload.reply_to = replyTo.id;
-    }
+    appendMessage(peerKey, optimistic);
 
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(msgPayload));
-    } else {
-      console.warn("WebSocket not connected, attempting reconnect...");
-      connectWebSocket();
-    }
-
-    addMessage(String(selectedUser.id), {
-      id: `sent-${Date.now()}`,
-      text: input.trim(),
-      sender: "me",
-      sender_id: currentUserId,
-      sender_name: session?.username || "You",
-      receiver_id: selectedUser.id,
-      time: getCurrentTime(),
-      reply_to: replyTo ? { text: replyTo.text, sender: replyTo.isMe ? "You" : selectedUser.username, sender_id: replyTo.isMe ? currentUserId : selectedUser.id } : null,
-    });
-    setInput("");
-    setReplyTo(null);
-  };
-
-  const updateLocalMessage = (userId: string, tempId: string, patch: Partial<Message>) => {
-    setMessagesByUser(prev => {
-      const list = prev[userId];
-      if (!list) return prev;
-      return {
-        ...prev,
-        [userId]: list.map(m => (m.id === tempId ? { ...m, ...patch } : m)),
-      };
-    });
-  };
-
-  const sendFile = async (file: File, caption: string) => {
-    if (!selectedUser) return;
-    const mediaType = detectMediaType(file);
-    const tempId = `sent-${Date.now()}`;
-    const localPreview = URL.createObjectURL(file);
-    const receiverKey = String(selectedUser.id);
-    const replySnapshot = replyTo;
-
-    // Optimistic message with local preview
-    addMessage(receiverKey, {
-      id: tempId,
-      text: caption,
-      sender: "me",
-      sender_id: currentUserId,
-      sender_name: session?.username || "You",
-      receiver_id: selectedUser.id,
-      time: getCurrentTime(),
-      reply_to: replySnapshot
-        ? { text: replySnapshot.text, sender: replySnapshot.isMe ? "You" : selectedUser.username, sender_id: replySnapshot.isMe ? currentUserId : selectedUser.id }
-        : null,
-      message_type: mediaType,
-      file_url: localPreview,
-      file_name: file.name,
-      file_size: file.size,
-      uploading: true,
-      progress: 0,
-    });
-
-    // Reset input UI immediately
+    // Reset input UI
     setInput("");
     setReplyTo(null);
     setPreviewFile(null);
     if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }
-    setIsUploading(true);
 
-    try {
-      const uploaded = await uploadFile(file, {
-        onProgress: (p) => updateLocalMessage(receiverKey, tempId, { progress: p }),
-      });
+    let attachment: ChatAttachment | null = null;
 
-      // Swap local blob URL with real URL, mark done
-      updateLocalMessage(receiverKey, tempId, {
-        uploading: false,
-        progress: 100,
-        file_url: uploaded.file_url,
-        file_name: uploaded.file_name,
-        file_size: uploaded.file_size,
-      });
-      URL.revokeObjectURL(localPreview);
-
-      // Send via WebSocket
-      const msgPayload: any = {
-        type: "chat_message",
-        sender_id: currentUserId,
-        receiver_id: selectedUser.id,
-        message: caption,
-        message_type: mediaType,
-        file_url: uploaded.file_url,
-        file_name: uploaded.file_name,
-        file_size: uploaded.file_size,
-      };
-      if (replySnapshot) msgPayload.reply_to = replySnapshot.id;
-
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify(msgPayload));
-      } else {
-        connectWebSocket();
+    if (file) {
+      setIsUploading(true);
+      try {
+        attachment = await uploadAttachment(file, currentUserId);
+        // Swap blob → real URL but keep tmpId for reconciliation
+        patchMessage(peerKey, tmpId, { file: attachment, uploading: false, upload_error: null });
+      } catch (err: any) {
+        console.error("Upload failed:", err);
+        toast.error(err?.message || "Upload failed");
+        patchMessage(peerKey, tmpId, { uploading: false, upload_error: "Upload failed" });
+        if (localUrl) URL.revokeObjectURL(localUrl);
+        setIsUploading(false);
+        return;
       }
-    } catch (err: any) {
-      console.error("Upload failed:", err);
-      toast.error(err?.message || "Upload failed");
-      // Mark message as failed by removing it
-      setMessagesByUser(prev => {
-        const list = prev[receiverKey];
-        if (!list) return prev;
-        return { ...prev, [receiverKey]: list.filter(m => m.id !== tempId) };
-      });
-      URL.revokeObjectURL(localPreview);
-    } finally {
+      if (localUrl) URL.revokeObjectURL(localUrl);
       setIsUploading(false);
+    }
+
+    const ok = sendChatMessage(wsRef.current, {
+      senderId: currentUserId,
+      receiverId: peerId,
+      text: text || null,
+      fileId: attachment?.id || null,
+      replyToId: replySnapshot?.id || null,
+    });
+
+    if (!ok) {
+      toast.error("Disconnected — message not sent");
+      patchMessage(peerKey, tmpId, { upload_error: "Not sent" });
+      connectWebSocket();
     }
   };
 
   const handlePickFile = (file: File | null) => {
     if (!file) return;
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error("File too large (max 50MB)");
-      return;
-    }
+    if (file.size > 50 * 1024 * 1024) { toast.error("File too large (max 50MB)"); return; }
     setPreviewFile(file);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
-    const mt = detectMediaType(file);
-    setPreviewUrl(mt === "image" || mt === "video" ? URL.createObjectURL(file) : null);
+    const kind = kindFromMime(file.type);
+    setPreviewUrl(kind === "image" || kind === "video" ? URL.createObjectURL(file) : null);
   };
 
   const cancelPreview = () => {
@@ -541,7 +414,7 @@ export default function Chat() {
     if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }
   };
 
-  // Drag & drop handlers (chat area)
+  // Drag & drop
   const handleDragEnter = (e: React.DragEvent) => {
     if (!selectedUser) return;
     e.preventDefault();
@@ -562,16 +435,11 @@ export default function Chat() {
     if (file) handlePickFile(file);
   };
 
-  const handleReply = (msg: { id: string; text: string; isMe: boolean }) => {
-    setReplyTo(msg);
-  };
-
-  const handleForwardRequest = (msg: { text: string }) => {
-    setForwardMsg(msg);
-  };
+  const handleReply = (msg: { id: string; text: string; isMe: boolean }) => setReplyTo(msg);
+  const handleForwardRequest = (msg: { text: string }) => setForwardMsg(msg);
 
   const handleForwardSend = (targetUserIds: (string | number)[]) => {
-    if (!forwardMsg || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    if (!forwardMsg || wsRef.current?.readyState !== WebSocket.OPEN) return;
     wsRef.current.send(JSON.stringify({
       type: "forward_message",
       sender_id: currentUserId,
@@ -582,20 +450,14 @@ export default function Chat() {
   };
 
   const handleDelete = (msg: { id: string; isMe: boolean }) => {
-    // Send delete via WebSocket
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: "delete_message",
-        message_id: msg.id,
-      }));
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "delete_message", message_id: msg.id }));
     }
-    // Optimistic UI: update ALL chats, not just selected
-    const msgId = String(msg.id);
     setMessagesByUser(prev => {
       const updated: typeof prev = {};
       for (const key of Object.keys(prev)) {
         updated[key] = prev[key].map(m =>
-          String(m.id) === msgId ? { ...m, deleted: true, text: "This message was deleted" } : m
+          m.id === msg.id ? { ...m, deleted: true, message: "This message was deleted" } : m,
         );
       }
       return updated;
@@ -613,7 +475,6 @@ export default function Chat() {
   };
 
   const filteredUsers = users.filter(u => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
-
   const selectedUserStatusInfo = selectedUser
     ? userStatuses[String(selectedUser.id)] || { status: "Offline" as const, last_seen: null }
     : undefined;
@@ -711,7 +572,6 @@ export default function Chat() {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {/* Drag overlay */}
         {isDragging && selectedUser && (
           <div className="absolute inset-0 z-50 bg-[#3390ec]/10 border-4 border-dashed border-[#3390ec] flex items-center justify-center pointer-events-none animate-fade-in">
             <div className="bg-white rounded-2xl px-6 py-4 shadow-lg flex items-center gap-3">
@@ -754,7 +614,6 @@ export default function Chat() {
             />
 
             <div className="bg-[#e8ebf0] px-2 py-[5px] md:px-[10px]">
-              {/* Reply preview */}
               {replyTo && (
                 <div className="mb-[5px]">
                   <div className="flex items-center gap-2 px-3 py-[6px] rounded-xl bg-white/80 border-l-[3px] border-[#3390ec]">
@@ -771,13 +630,12 @@ export default function Chat() {
                 </div>
               )}
 
-              {/* File preview before send */}
               {previewFile && (
                 <div className="mb-[5px]">
                   <div className="flex items-center gap-3 px-3 py-[8px] rounded-xl bg-white/90 border border-gray-200 shadow-sm animate-fade-in">
-                    {previewUrl && detectMediaType(previewFile) === "image" ? (
+                    {previewUrl && kindFromMime(previewFile.type) === "image" ? (
                       <img src={previewUrl} alt={previewFile.name} className="h-12 w-12 rounded-lg object-cover flex-shrink-0" />
-                    ) : previewUrl && detectMediaType(previewFile) === "video" ? (
+                    ) : previewUrl && kindFromMime(previewFile.type) === "video" ? (
                       <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-black flex-shrink-0">
                         <video src={previewUrl} className="h-full w-full object-cover" muted />
                         <Film className="absolute inset-0 m-auto h-5 w-5 text-white drop-shadow" />
@@ -800,16 +658,12 @@ export default function Chat() {
               )}
 
               <div className="flex items-end gap-[6px]">
-                {/* Attach button */}
                 <input
                   ref={fileInputRef}
                   type="file"
                   className="hidden"
                   accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt"
-                  onChange={(e) => {
-                    handlePickFile(e.target.files?.[0] || null);
-                    e.target.value = "";
-                  }}
+                  onChange={(e) => { handlePickFile(e.target.files?.[0] || null); e.target.value = ""; }}
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -854,7 +708,6 @@ export default function Chat() {
         )}
       </div>
 
-      {/* Forward modal */}
       <ForwardModal
         open={!!forwardMsg}
         onClose={() => setForwardMsg(null)}

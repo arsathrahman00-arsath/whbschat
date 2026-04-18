@@ -2,59 +2,16 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageCircle } from "lucide-react";
 import MessageContextMenu from "@/components/MessageContextMenu";
-import MediaMessage from "@/components/MediaMessage";
-import type { MediaType } from "@/lib/uploadFile";
+import Attachment from "@/components/Attachment";
+import { mapToChatMessage, type ChatMessage } from "@/lib/chatMessage";
 import { toast } from "sonner";
-
-export interface UnifiedMessage {
-  key: string;
-  id?: string;
-  isMe: boolean;
-  text: string;
-  time: string;
-  dateSource: string | undefined;
-  deleted?: boolean;
-  reply_to?: { text: string; sender: string; sender_id?: string | number } | null;
-  message_type?: MediaType | "text";
-  file_url?: string;
-  file_name?: string;
-  file_size?: number;
-  uploading?: boolean;
-  progress?: number;
-}
-
-interface ChatMessage {
-  sender_id: string;
-  message: string;
-  created_at?: string;
-  time?: string;
-  id?: string;
-  deleted?: boolean;
-  reply_to?: { text: string; sender: string; sender_id?: string } | null;
-  message_type?: MediaType | "text";
-  file_url?: string;
-  file_name?: string;
-  file_size?: number;
-}
 
 interface ChatMessagesProps {
   chatId: string | number | null;
   currentUserId: string | number;
   selectedUsername: string;
-  localMessages: {
-    id: string;
-    text: string;
-    sender: "me" | "other";
-    time?: string;
-    deleted?: boolean;
-    reply_to?: { text: string; sender: string; sender_id?: string | number } | null;
-    message_type?: MediaType | "text";
-    file_url?: string;
-    file_name?: string;
-    file_size?: number;
-    uploading?: boolean;
-    progress?: number;
-  }[];
+  /** Already-normalized live messages (optimistic + WS) for this conversation. */
+  localMessages: ChatMessage[];
   onReply?: (msg: { id: string; text: string; isMe: boolean }) => void;
   onForward?: (msg: { text: string }) => void;
   onDelete?: (msg: { id: string; isMe: boolean }) => void;
@@ -64,24 +21,16 @@ const API_BASE = "https://ngrchatbot.whindia.in";
 
 function formatTime(dateStr?: string): string {
   if (!dateStr) return "";
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
-  } catch {
-    return dateStr;
-  }
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
 }
 
 function getDateOnly(dateStr?: string): string | null {
   if (!dateStr) return null;
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return null;
-    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-  } catch {
-    return null;
-  }
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
 function formatDateLabel(dateStr?: string): string {
@@ -118,106 +67,55 @@ export default function ChatMessages({
 }: ChatMessagesProps) {
   const [apiMessages, setApiMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    msg: UnifiedMessage;
-  } | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<UnifiedMessage | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; msg: ChatMessage } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<ChatMessage | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     if (!chatId) { setApiMessages([]); return; }
-    fetchMessages();
-  }, [chatId]);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_BASE}/chat/get_chat_messages/?chat_id=${chatId}`);
+        const data = await res.json();
+        const msgs = Array.isArray(data) ? data : data.data || data.messages || data.results || [];
+        if (cancelled) return;
+        setApiMessages(msgs.map((m: any) => mapToChatMessage(m, currentUserId)));
+      } catch (err) {
+        console.error("Failed to fetch messages:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [chatId, currentUserId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [apiMessages, localMessages]);
 
-  const fetchMessages = async () => {
-    if (!chatId) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/chat/get_chat_messages/?chat_id=${chatId}`);
-      const data = await res.json();
-      const msgs = Array.isArray(data) ? data : data.data || data.messages || data.results || [];
-      setApiMessages(msgs);
-    } catch (err) {
-      console.error("Failed to fetch messages:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Build unified list: merge API + local, deduplicate by ID, local wins
-  const unified: UnifiedMessage[] = (() => {
-    const mergedMap = new Map<string, UnifiedMessage>();
-
-    // First pass: API messages
-    apiMessages.forEach((msg, idx) => {
-      const key = msg.id ? String(msg.id) : `api-${idx}`;
-      let mappedReply = msg.reply_to || null;
-      if (mappedReply) {
-        const replySid = mappedReply.sender_id;
-        const replySenderName = replySid
-          ? (String(replySid) === String(currentUserId) ? "You" : (mappedReply.sender || "User"))
-          : (mappedReply.sender || "User");
-        mappedReply = { text: mappedReply.text, sender: replySenderName };
-      }
-      mergedMap.set(key, {
-        key,
-        id: msg.id || "",
-        isMe: String(msg.sender_id) === String(currentUserId),
-        text: msg.deleted ? "This message was deleted" : msg.message,
-        time: formatTime(msg.created_at) || msg.time || "",
-        dateSource: msg.created_at || msg.time,
-        deleted: msg.deleted,
-        reply_to: mappedReply,
-        message_type: msg.message_type || "text",
-        file_url: msg.file_url,
-        file_name: msg.file_name,
-        file_size: msg.file_size,
-      });
+  // Merge: API first, then local — local wins on duplicate id.
+  const merged: ChatMessage[] = (() => {
+    const map = new Map<string, ChatMessage>();
+    apiMessages.forEach(m => map.set(m.id, m));
+    localMessages.forEach(m => {
+      const existing = map.get(m.id);
+      map.set(m.id, existing ? { ...existing, ...m } : m);
     });
-
-    // Second pass: local messages override or add
-    localMessages.forEach((msg) => {
-      const key = String(msg.id);
-      const existing = mergedMap.get(key);
-      // Local always wins (has latest state from WebSocket)
-      const entry: UnifiedMessage = {
-        key,
-        id: msg.id,
-        isMe: msg.sender === "me",
-        text: msg.deleted ? "This message was deleted" : msg.text,
-        time: msg.time || (existing?.time || ""),
-        dateSource: msg.time || (existing?.dateSource),
-        deleted: msg.deleted,
-        reply_to: msg.reply_to ?? (existing?.reply_to || null),
-        message_type: msg.message_type || existing?.message_type || "text",
-        file_url: msg.file_url ?? existing?.file_url,
-        file_name: msg.file_name ?? existing?.file_name,
-        file_size: msg.file_size ?? existing?.file_size,
-        uploading: msg.uploading,
-        progress: msg.progress,
-      };
-      mergedMap.set(key, entry);
-    });
-
-    return Array.from(mergedMap.values());
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    );
   })();
 
-  const allEmpty = unified.length === 0;
-
-  const handleContextMenu = useCallback((e: React.MouseEvent, msg: UnifiedMessage) => {
+  const handleContextMenu = useCallback((e: React.MouseEvent, msg: ChatMessage) => {
     if (msg.deleted) return;
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, msg });
   }, []);
 
-  const handleTouchStart = useCallback((e: React.TouchEvent, msg: UnifiedMessage) => {
+  const handleTouchStart = useCallback((e: React.TouchEvent, msg: ChatMessage) => {
     if (msg.deleted) return;
     const touch = e.touches[0];
     longPressTimerRef.current = setTimeout(() => {
@@ -234,46 +132,47 @@ export default function ChatMessages({
     toast.success("Copied");
   }, []);
 
-  // Render messages
   let lastDateKey: string | null = null;
   const rendered: React.ReactNode[] = [];
 
-  unified.forEach((m, idx) => {
-    const dateKey = getDateOnly(m.dateSource);
+  merged.forEach((m, idx) => {
+    const isMe = String(m.sender_id) === String(currentUserId);
+    const dateKey = getDateOnly(m.created_at);
     if (dateKey && dateKey !== lastDateKey) {
-      const label = formatDateLabel(m.dateSource);
-      if (label) rendered.push(<DateSeparator key={`sep-${dateKey}`} label={label} />);
+      const label = formatDateLabel(m.created_at);
+      if (label) rendered.push(<DateSeparator key={`sep-${dateKey}-${idx}`} label={label} />);
       lastDateKey = dateKey;
     }
 
-    const prevMsg = idx > 0 ? unified[idx - 1] : null;
-    const nextMsg = idx < unified.length - 1 ? unified[idx + 1] : null;
-    const sameSenderAsPrev = prevMsg && prevMsg.isMe === m.isMe && getDateOnly(prevMsg.dateSource) === dateKey;
-    const sameSenderAsNext = nextMsg && nextMsg.isMe === m.isMe && getDateOnly(nextMsg.dateSource) === dateKey;
+    const prevMsg = idx > 0 ? merged[idx - 1] : null;
+    const nextMsg = idx < merged.length - 1 ? merged[idx + 1] : null;
+    const prevIsMe = prevMsg ? String(prevMsg.sender_id) === String(currentUserId) : null;
+    const nextIsMe = nextMsg ? String(nextMsg.sender_id) === String(currentUserId) : null;
+    const sameSenderAsPrev = prevMsg && prevIsMe === isMe && getDateOnly(prevMsg.created_at) === dateKey;
+    const sameSenderAsNext = nextMsg && nextIsMe === isMe && getDateOnly(nextMsg.created_at) === dateKey;
 
-    // Telegram-style spacing: tight for same sender, larger gap on sender change
     const spacingClass = sameSenderAsPrev ? "mt-[3px]" : "mt-[10px]";
 
-    // Telegram-style bubble tail rounding
     const getBubbleRadius = () => {
-      if (m.isMe) {
+      if (isMe) {
         const topRight = sameSenderAsPrev ? "rounded-tr-md" : "rounded-tr-2xl";
         const bottomRight = sameSenderAsNext ? "rounded-br-md" : "rounded-br-md";
         return `rounded-tl-2xl ${topRight} rounded-bl-2xl ${bottomRight}`;
-      } else {
-        const topLeft = sameSenderAsPrev ? "rounded-tl-md" : "rounded-tl-2xl";
-        const bottomLeft = sameSenderAsNext ? "rounded-bl-md" : "rounded-bl-md";
-        return `${topLeft} rounded-tr-2xl ${bottomLeft} rounded-br-2xl`;
       }
+      const topLeft = sameSenderAsPrev ? "rounded-tl-md" : "rounded-tl-2xl";
+      const bottomLeft = sameSenderAsNext ? "rounded-bl-md" : "rounded-bl-md";
+      return `${topLeft} rounded-tr-2xl ${bottomLeft} rounded-br-2xl`;
     };
 
-    const isMedia = !m.deleted && m.message_type && m.message_type !== "text";
-    const hasCaption = isMedia && m.text && m.text.trim().length > 0;
+    const hasFile = !m.deleted && !!m.file;
+    const text = m.deleted ? "This message was deleted" : m.message || "";
+    const hasText = text.trim().length > 0;
+    const hasCaption = hasFile && hasText;
 
     rendered.push(
       <div
-        key={m.key}
-        className={`flex ${m.isMe ? "justify-end" : "justify-start"} ${idx === 0 ? "" : spacingClass}`}
+        key={m.id}
+        className={`flex ${isMe ? "justify-end" : "justify-start"} ${idx === 0 ? "" : spacingClass}`}
         onContextMenu={(e) => handleContextMenu(e, m)}
         onTouchStart={(e) => handleTouchStart(e, m)}
         onTouchEnd={handleTouchEnd}
@@ -281,65 +180,51 @@ export default function ChatMessages({
       >
         <div
           className={`max-w-[65%] text-[14px] leading-[1.35] select-none overflow-hidden ${getBubbleRadius()} ${
-            isMedia ? "p-[3px]" : "px-3 py-[6px]"
+            hasFile ? "p-[3px]" : "px-3 py-[6px]"
           } ${
             m.deleted
               ? "bg-muted/50 text-muted-foreground italic px-3 py-[6px]"
-              : m.isMe
+              : isMe
                 ? "bg-primary text-primary-foreground"
                 : "bg-card text-foreground shadow-sm"
           }`}
         >
-          {/* Reply quote */}
           {m.reply_to && !m.deleted && (
             <div className={`mb-[5px] rounded-[4px] border-l-[3px] cursor-pointer overflow-hidden ${
-              isMedia ? "mx-[3px] mt-[3px]" : ""
-            } ${
-              m.isMe
-                ? "bg-[#ffffff1a] border-white/60"
-                : "bg-[#3390ec0d] border-[#3390ec]"
-            }`}>
+              hasFile ? "mx-[3px] mt-[3px]" : ""
+            } ${isMe ? "bg-[#ffffff1a] border-white/60" : "bg-[#3390ec0d] border-[#3390ec]"}`}>
               <div className="px-[7px] py-[4px]">
-                <p className={`text-[12px] font-semibold leading-tight ${
-                  m.isMe ? "text-white" : "text-[#3390ec]"
-                }`}>{m.reply_to.sender}</p>
+                <p className={`text-[12px] font-semibold leading-tight ${isMe ? "text-white" : "text-[#3390ec]"}`}>
+                  {m.reply_to.sender}
+                </p>
                 <p className={`text-[12px] leading-tight line-clamp-1 mt-[1px] ${
-                  m.isMe ? "text-white/70" : "text-[#000000]/50"
+                  isMe ? "text-white/70" : "text-[#000000]/50"
                 }`}>{m.reply_to.text}</p>
               </div>
             </div>
           )}
 
-          {/* Media body */}
-          {isMedia && (
-            <MediaMessage
-              message_type={m.message_type as MediaType}
-              file_url={m.file_url}
-              file_name={m.file_name}
-              file_size={m.file_size}
+          {hasFile && m.file && (
+            <Attachment
+              file={m.file}
+              isMe={isMe}
               uploading={m.uploading}
-              progress={m.progress}
-              isMe={m.isMe}
+              uploadError={m.upload_error}
             />
           )}
 
-          {/* Text / caption */}
-          {(!isMedia || hasCaption) && !m.deleted && m.text && (
-            <span className={`break-words whitespace-pre-wrap ${isMedia ? "block px-[9px] py-[6px]" : ""}`}>
-              {m.text}
+          {(!hasFile || hasCaption) && !m.deleted && hasText && (
+            <span className={`break-words whitespace-pre-wrap ${hasFile ? "block px-[9px] py-[6px]" : ""}`}>
+              {text}
             </span>
           )}
-          {m.deleted && (
-            <span className="break-words whitespace-pre-wrap">{m.text}</span>
-          )}
+          {m.deleted && <span className="break-words whitespace-pre-wrap">{text}</span>}
 
-          {m.time && !m.deleted && (
+          {!m.deleted && (
             <span className={`text-[11px] float-right leading-[1.6] ${
-              isMedia && !hasCaption ? "px-[9px] pb-[4px] mt-0" : "mt-[2px] ml-3"
-            } ${
-              m.isMe ? "text-primary-foreground/70" : "text-muted-foreground/60"
-            }`}>
-              {m.time}
+              hasFile && !hasCaption ? "px-[9px] pb-[4px] mt-0" : "mt-[2px] ml-3"
+            } ${isMe ? "text-primary-foreground/70" : "text-muted-foreground/60"}`}>
+              {formatTime(m.created_at)}
             </span>
           )}
         </div>
@@ -355,8 +240,7 @@ export default function ChatMessages({
             <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         )}
-
-        {!loading && allEmpty && (
+        {!loading && merged.length === 0 && (
           <div className="flex-1 flex items-center justify-center py-20">
             <div className="text-center">
               <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
@@ -369,29 +253,32 @@ export default function ChatMessages({
             </div>
           </div>
         )}
-
         {rendered}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Context menu */}
       {contextMenu && (
         <MessageContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
-          isMe={contextMenu.msg.isMe}
+          isMe={String(contextMenu.msg.sender_id) === String(currentUserId)}
           onReply={() => {
             if (onReply && contextMenu.msg.id) {
-              onReply({ id: contextMenu.msg.id, text: contextMenu.msg.text, isMe: contextMenu.msg.isMe });
+              const isMe = String(contextMenu.msg.sender_id) === String(currentUserId);
+              onReply({
+                id: contextMenu.msg.id,
+                text: contextMenu.msg.message || (contextMenu.msg.file ? contextMenu.msg.file.name : ""),
+                isMe,
+              });
             }
             setContextMenu(null);
           }}
           onForward={() => {
-            if (onForward) onForward({ text: contextMenu.msg.text });
+            if (onForward) onForward({ text: contextMenu.msg.message || "" });
             setContextMenu(null);
           }}
           onCopy={() => {
-            handleCopy(contextMenu.msg.text);
+            handleCopy(contextMenu.msg.message || "");
             setContextMenu(null);
           }}
           onDelete={() => {
@@ -402,7 +289,6 @@ export default function ChatMessages({
         />
       )}
 
-      {/* Delete confirmation */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-foreground/40" onClick={() => setDeleteConfirm(null)}>
           <div className="bg-card rounded-2xl p-5 w-72 shadow-xl" onClick={e => e.stopPropagation()}>
@@ -410,7 +296,12 @@ export default function ChatMessages({
             <div className="space-y-2">
               <button
                 onClick={() => {
-                  if (onDelete && deleteConfirm.id) onDelete({ id: deleteConfirm.id, isMe: deleteConfirm.isMe });
+                  if (onDelete && deleteConfirm.id) {
+                    onDelete({
+                      id: deleteConfirm.id,
+                      isMe: String(deleteConfirm.sender_id) === String(currentUserId),
+                    });
+                  }
                   setDeleteConfirm(null);
                 }}
                 className="w-full py-2.5 text-sm text-destructive hover:bg-destructive/10 rounded-xl transition-colors"

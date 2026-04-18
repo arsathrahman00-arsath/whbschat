@@ -1,69 +1,48 @@
 import { useState } from "react";
-import { Play, FileText, Download, X } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
-import { formatFileSize, type MediaType } from "@/lib/uploadFile";
+import { Play, FileText, Download, X, AlertCircle, Loader2 } from "lucide-react";
+import { formatFileSize, type ChatAttachment } from "@/lib/chatMessage";
 
-export interface MediaPayload {
-  message_type: MediaType;
-  file_url?: string;
-  file_name?: string;
-  file_size?: number;
+interface AttachmentProps {
+  file: ChatAttachment;
+  isMe: boolean;
   uploading?: boolean;
-  progress?: number;
-  isMe?: boolean;
+  uploadError?: string | null;
 }
 
-function FileIcon() {
-  return (
-    <div className="h-11 w-11 rounded-full bg-[#3390ec] text-white flex items-center justify-center flex-shrink-0">
-      <FileText className="h-5 w-5" />
-    </div>
-  );
-}
-
-export default function MediaMessage({
-  message_type,
-  file_url,
-  file_name,
-  file_size,
-  uploading,
-  progress = 0,
-  isMe,
-}: MediaPayload) {
+export default function Attachment({ file, isMe, uploading, uploadError }: AttachmentProps) {
   const [lightbox, setLightbox] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
 
-  const overlay = uploading && (
-    <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-[14px]">
-      <div className="text-white text-sm font-semibold drop-shadow">
-        {progress}%
-      </div>
+  const stateOverlay = (uploading || uploadError) && (
+    <div className="absolute inset-0 bg-black/45 flex items-center justify-center rounded-[14px]">
+      {uploadError ? (
+        <div className="flex items-center gap-1 text-white text-xs font-medium">
+          <AlertCircle className="h-4 w-4" /> Failed
+        </div>
+      ) : (
+        <Loader2 className="h-6 w-6 text-white animate-spin" />
+      )}
     </div>
   );
 
-  if (message_type === "image") {
+  if (file.message_type === "image") {
     return (
       <>
         <div className="relative max-w-[260px] animate-fade-in">
-          {file_url ? (
+          {file.url ? (
             <img
-              src={file_url}
-              alt={file_name || "image"}
+              src={file.url}
+              alt={file.name}
               loading="lazy"
-              onClick={() => !uploading && setLightbox(true)}
+              onClick={() => !uploading && !uploadError && setLightbox(true)}
               className="rounded-[14px] w-full h-auto cursor-pointer object-cover transition-opacity"
             />
           ) : (
             <div className="rounded-[14px] w-[220px] h-[160px] bg-black/10 animate-pulse" />
           )}
-          {overlay}
-          {uploading && (
-            <div className="absolute bottom-2 left-2 right-2">
-              <Progress value={progress} className="h-1 bg-white/30" />
-            </div>
-          )}
+          {stateOverlay}
         </div>
-        {lightbox && file_url && (
+        {lightbox && file.url && (
           <div
             className="fixed inset-0 z-[10001] bg-black/90 flex items-center justify-center p-4"
             onClick={() => setLightbox(false)}
@@ -76,8 +55,8 @@ export default function MediaMessage({
               <X className="h-5 w-5" />
             </button>
             <img
-              src={file_url}
-              alt={file_name || "image"}
+              src={file.url}
+              alt={file.name}
               className="max-w-full max-h-full rounded-lg"
               onClick={(e) => e.stopPropagation()}
             />
@@ -87,25 +66,20 @@ export default function MediaMessage({
     );
   }
 
-  if (message_type === "video") {
+  if (file.message_type === "video") {
     return (
       <>
         <div className="relative max-w-[260px] animate-fade-in">
           <div
-            onClick={() => !uploading && file_url && setVideoOpen(true)}
+            onClick={() => !uploading && !uploadError && file.url && setVideoOpen(true)}
             className="relative rounded-[14px] overflow-hidden bg-black cursor-pointer aspect-video"
           >
-            {file_url ? (
-              <video
-                src={file_url}
-                preload="metadata"
-                className="w-full h-full object-cover"
-                muted
-              />
+            {file.url ? (
+              <video src={file.url} preload="metadata" muted className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full bg-black/20 animate-pulse" />
             )}
-            {!uploading && (
+            {!uploading && !uploadError && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="h-12 w-12 rounded-full bg-black/60 flex items-center justify-center">
                   <Play className="h-6 w-6 text-white fill-white ml-0.5" />
@@ -113,14 +87,9 @@ export default function MediaMessage({
               </div>
             )}
           </div>
-          {overlay}
-          {uploading && (
-            <div className="absolute bottom-2 left-2 right-2">
-              <Progress value={progress} className="h-1 bg-white/30" />
-            </div>
-          )}
+          {stateOverlay}
         </div>
-        {videoOpen && file_url && (
+        {videoOpen && file.url && (
           <div
             className="fixed inset-0 z-[10001] bg-black/90 flex items-center justify-center p-4"
             onClick={() => setVideoOpen(false)}
@@ -133,7 +102,7 @@ export default function MediaMessage({
               <X className="h-5 w-5" />
             </button>
             <video
-              src={file_url}
+              src={file.url}
               controls
               autoPlay
               className="max-w-full max-h-full rounded-lg"
@@ -153,35 +122,29 @@ export default function MediaMessage({
           isMe ? "hover:bg-white/10" : "hover:bg-black/5"
         }`}
       >
-        {uploading ? (
-          <div className="h-11 w-11 rounded-full bg-[#3390ec]/80 text-white flex items-center justify-center flex-shrink-0 text-xs font-semibold">
-            {progress}%
-          </div>
-        ) : (
-          <FileIcon />
-        )}
+        <div className="h-11 w-11 rounded-full bg-[#3390ec] text-white flex items-center justify-center flex-shrink-0">
+          {uploading ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : uploadError ? (
+            <AlertCircle className="h-5 w-5" />
+          ) : (
+            <FileText className="h-5 w-5" />
+          )}
+        </div>
         <div className="flex-1 min-w-0">
-          <p
-            className={`text-[14px] font-medium truncate ${
-              isMe ? "text-white" : "text-foreground"
-            }`}
-          >
-            {file_name || "File"}
+          <p className={`text-[14px] font-medium truncate ${isMe ? "text-white" : "text-foreground"}`}>
+            {file.name || "File"}
           </p>
-          <p
-            className={`text-[12px] ${
-              isMe ? "text-white/70" : "text-muted-foreground"
-            }`}
-          >
-            {uploading ? "Uploading…" : formatFileSize(file_size || 0)}
+          <p className={`text-[12px] ${isMe ? "text-white/70" : "text-muted-foreground"}`}>
+            {uploading ? "Uploading…" : uploadError ? uploadError : formatFileSize(file.size || 0)}
           </p>
         </div>
-        {!uploading && file_url && (
+        {!uploading && !uploadError && file.url && (
           <a
-            href={file_url}
+            href={file.url}
             target="_blank"
             rel="noopener noreferrer"
-            download={file_name}
+            download={file.name}
             onClick={(e) => e.stopPropagation()}
             className={`p-2 rounded-full flex-shrink-0 ${
               isMe ? "text-white hover:bg-white/10" : "text-[#3390ec] hover:bg-[#3390ec]/10"
@@ -192,9 +155,6 @@ export default function MediaMessage({
           </a>
         )}
       </div>
-      {uploading && (
-        <Progress value={progress} className={`h-1 mt-1 ${isMe ? "bg-white/20" : ""}`} />
-      )}
     </div>
   );
 }

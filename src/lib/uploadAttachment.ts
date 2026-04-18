@@ -47,7 +47,7 @@ export function uploadAttachment(
         }
         const mime = data.mime_type || data.file_type || file.type || "";
         const kind: AttachmentKind = (data.message_type as AttachmentKind) || kindFromMime(mime);
-        const url = data.file_url || data.url || buildFileUrl(fileId);
+        const url = resolveFileUrl(data.file_url || data.url || fileId);
         resolve({
           id: fileId,
           name: data.file_name || file.name,

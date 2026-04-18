@@ -704,7 +704,23 @@ export default function Chat() {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div
+        className="flex-1 flex flex-col min-w-0 relative"
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {/* Drag overlay */}
+        {isDragging && selectedUser && (
+          <div className="absolute inset-0 z-50 bg-[#3390ec]/10 border-4 border-dashed border-[#3390ec] flex items-center justify-center pointer-events-none animate-fade-in">
+            <div className="bg-white rounded-2xl px-6 py-4 shadow-lg flex items-center gap-3">
+              <Paperclip className="h-6 w-6 text-[#3390ec]" />
+              <p className="text-base font-semibold text-[#3390ec]">Drop file to send</p>
+            </div>
+          </div>
+        )}
+
         {selectedUser ? (
           <>
             <div className="h-16 px-4 md:px-6 flex items-center gap-3 border-b border-gray-200 bg-white">
@@ -754,14 +770,63 @@ export default function Chat() {
                   </div>
                 </div>
               )}
+
+              {/* File preview before send */}
+              {previewFile && (
+                <div className="mb-[5px]">
+                  <div className="flex items-center gap-3 px-3 py-[8px] rounded-xl bg-white/90 border border-gray-200 shadow-sm animate-fade-in">
+                    {previewUrl && detectMediaType(previewFile) === "image" ? (
+                      <img src={previewUrl} alt={previewFile.name} className="h-12 w-12 rounded-lg object-cover flex-shrink-0" />
+                    ) : previewUrl && detectMediaType(previewFile) === "video" ? (
+                      <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-black flex-shrink-0">
+                        <video src={previewUrl} className="h-full w-full object-cover" muted />
+                        <Film className="absolute inset-0 m-auto h-5 w-5 text-white drop-shadow" />
+                      </div>
+                    ) : (
+                      <div className="h-12 w-12 rounded-lg bg-[#3390ec]/10 flex items-center justify-center flex-shrink-0">
+                        <FileText className="h-6 w-6 text-[#3390ec]" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-gray-900 truncate">{previewFile.name}</p>
+                      <p className="text-[12px] text-[#707579]">{formatFileSize(previewFile.size)}</p>
+                    </div>
+                    <button onClick={cancelPreview} disabled={isUploading}
+                      className="p-1 rounded-full text-[#707579] hover:text-destructive hover:bg-black/5 transition-colors disabled:opacity-40">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-end gap-[6px]">
+                {/* Attach button */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt"
+                  onChange={(e) => {
+                    handlePickFile(e.target.files?.[0] || null);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="h-[42px] w-[42px] rounded-full text-[#707579] hover:text-[#3390ec] hover:bg-white/60 transition-colors flex items-center justify-center flex-shrink-0 disabled:opacity-40"
+                  title="Attach file"
+                >
+                  <Paperclip className="h-[22px] w-[22px]" />
+                </button>
+
                 <div className="flex-1 flex items-end bg-white rounded-[21px] shadow-sm min-h-[42px]">
                   <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                    placeholder="Message"
+                    placeholder={previewFile ? "Add a caption…" : "Message"}
                     className="flex-1 bg-transparent px-[14px] py-[9px] text-[15px] text-[#000000] placeholder:text-[#a2acb4] focus:outline-none leading-[22px]" />
                 </div>
-                {input.trim() ? (
-                  <button onClick={handleSend} disabled={!wsConnected}
+                {(input.trim() || previewFile) ? (
+                  <button onClick={handleSend} disabled={!wsConnected || isUploading}
                     className="h-[42px] w-[42px] rounded-full bg-[#3390ec] text-white flex items-center justify-center hover:bg-[#2b7ed8] active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none flex-shrink-0 shadow-sm">
                     <Send className="h-5 w-5 ml-[1px]" />
                   </button>

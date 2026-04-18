@@ -175,6 +175,10 @@ export default function ChatMessages({
         dateSource: msg.created_at || msg.time,
         deleted: msg.deleted,
         reply_to: mappedReply,
+        message_type: msg.message_type || "text",
+        file_url: msg.file_url,
+        file_name: msg.file_name,
+        file_size: msg.file_size,
       });
     });
 
@@ -192,6 +196,12 @@ export default function ChatMessages({
         dateSource: msg.time || (existing?.dateSource),
         deleted: msg.deleted,
         reply_to: msg.reply_to ?? (existing?.reply_to || null),
+        message_type: msg.message_type || existing?.message_type || "text",
+        file_url: msg.file_url ?? existing?.file_url,
+        file_name: msg.file_name ?? existing?.file_name,
+        file_size: msg.file_size ?? existing?.file_size,
+        uploading: msg.uploading,
+        progress: msg.progress,
       };
       mergedMap.set(key, entry);
     });

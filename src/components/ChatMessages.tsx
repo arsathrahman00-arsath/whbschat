@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageCircle } from "lucide-react";
 import MessageContextMenu from "@/components/MessageContextMenu";
+import MediaMessage from "@/components/MediaMessage";
+import type { MediaType } from "@/lib/uploadFile";
 import { toast } from "sonner";
 
 export interface UnifiedMessage {
@@ -13,6 +15,12 @@ export interface UnifiedMessage {
   dateSource: string | undefined;
   deleted?: boolean;
   reply_to?: { text: string; sender: string; sender_id?: string | number } | null;
+  message_type?: MediaType | "text";
+  file_url?: string;
+  file_name?: string;
+  file_size?: number;
+  uploading?: boolean;
+  progress?: number;
 }
 
 interface ChatMessage {
@@ -23,6 +31,10 @@ interface ChatMessage {
   id?: string;
   deleted?: boolean;
   reply_to?: { text: string; sender: string; sender_id?: string } | null;
+  message_type?: MediaType | "text";
+  file_url?: string;
+  file_name?: string;
+  file_size?: number;
 }
 
 interface ChatMessagesProps {
@@ -36,6 +48,12 @@ interface ChatMessagesProps {
     time?: string;
     deleted?: boolean;
     reply_to?: { text: string; sender: string; sender_id?: string | number } | null;
+    message_type?: MediaType | "text";
+    file_url?: string;
+    file_name?: string;
+    file_size?: number;
+    uploading?: boolean;
+    progress?: number;
   }[];
   onReply?: (msg: { id: string; text: string; isMe: boolean }) => void;
   onForward?: (msg: { text: string }) => void;

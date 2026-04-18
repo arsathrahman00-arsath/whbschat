@@ -32,13 +32,23 @@ export interface ChatMessage {
   upload_error?: string | null;
 }
 
-const FILE_BASE = "https://ngrchatbot.whindia.in";
+export const FILE_BASE = "https://ngrchatbot.whindia.in";
 
-/** Build a usable URL for a file_id when the backend only returns the id. */
+/** Resolve any backend-provided URL/path to an absolute URL on FILE_BASE. */
+export function resolveFileUrl(input: string | number | null | undefined): string {
+  if (input == null) return "";
+  const s = String(input).trim();
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s)) return s;
+  // Relative path returned by backend (e.g. "/chat/media-file/123/")
+  if (s.startsWith("/")) return `${FILE_BASE}${s}`;
+  // Bare id
+  return `${FILE_BASE}/chat/media-file/${s}/`;
+}
+
+/** Back-compat alias. */
 export function buildFileUrl(fileId: string | number): string {
-  const id = String(fileId);
-  if (/^https?:\/\//i.test(id)) return id;
-  return `${FILE_BASE}/chat/file/${id}/`;
+  return resolveFileUrl(fileId);
 }
 
 export function kindFromMime(mime: string | undefined): AttachmentKind {

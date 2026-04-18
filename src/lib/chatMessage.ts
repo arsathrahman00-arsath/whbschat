@@ -38,7 +38,7 @@ const FILE_BASE = "https://ngrchatbot.whindia.in";
 export function buildFileUrl(fileId: string | number): string {
   const id = String(fileId);
   if (/^https?:\/\//i.test(id)) return id;
-  return `${FILE_BASE}/messenger/file/${id}/`;
+  return `${FILE_BASE}/chat/file/${id}/`;
 }
 
 export function kindFromMime(mime: string | undefined): AttachmentKind {
@@ -70,8 +70,7 @@ export function mapToChatMessage(raw: any, currentUserId: string | number): Chat
         name: f.name || f.file_name || "file",
         mime_type: f.mime_type || f.type || "",
         size: Number(f.size ?? f.file_size ?? 0),
-        message_type:
-          (f.message_type as AttachmentKind) || kindFromMime(f.mime_type || f.type),
+        message_type: (f.message_type as AttachmentKind) || kindFromMime(f.mime_type || f.type),
         url,
       };
     }
@@ -84,9 +83,7 @@ export function mapToChatMessage(raw: any, currentUserId: string | number): Chat
       name: raw.file_name || "file",
       mime_type: raw.mime_type || raw.file_type || "",
       size: Number(raw.file_size ?? 0),
-      message_type:
-        (raw.message_type as AttachmentKind) ||
-        kindFromMime(raw.mime_type || raw.file_type),
+      message_type: (raw.message_type as AttachmentKind) || kindFromMime(raw.mime_type || raw.file_type),
       url,
     };
   }

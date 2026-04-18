@@ -1,4 +1,4 @@
-// Upload a file to /messenger/upload_file/ and return a normalized attachment.
+// Upload a file to /chat/upload_file/ and return a normalized attachment.
 // Contract:
 //   POST FormData(file, sender_id) -> { file_id, file_name, mime_type, file_size, message_type }
 // We tolerate small variations in the response shape and always return a

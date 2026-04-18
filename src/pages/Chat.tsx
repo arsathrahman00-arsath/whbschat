@@ -319,13 +319,17 @@ export default function Chat() {
 
         addMessage(senderId, {
           id: String(data.id || data.message_id || `ws-${Date.now()}`),
-          text: data.message,
+          text: data.message || "",
           sender: "other",
           sender_id: data.sender_id,
           sender_name: senderName,
           receiver_id: data.receiver_id,
           time: data.time || getCurrentTime(),
           reply_to: replyToData,
+          message_type: data.message_type || "text",
+          file_url: data.file_url,
+          file_name: data.file_name,
+          file_size: data.file_size,
         });
       } catch (err) {
         console.error("Failed to parse WebSocket message:", err);

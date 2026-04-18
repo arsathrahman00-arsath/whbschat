@@ -4,14 +4,9 @@
 // We tolerate small variations in the response shape and always return a
 // ChatAttachment ready to be embedded in a ChatMessage.
 
-import {
-  buildFileUrl,
-  kindFromMime,
-  type AttachmentKind,
-  type ChatAttachment,
-} from "./chatMessage";
+import { buildFileUrl, kindFromMime, type AttachmentKind, type ChatAttachment } from "./chatMessage";
 
-const UPLOAD_URL = "https://ngrchatbot.whindia.in/messenger/upload_file/";
+const UPLOAD_URL = "https://ngrchatbot.whindia.in/chat/upload_file/";
 
 export interface UploadOptions {
   onProgress?: (percent: number) => void;
@@ -51,8 +46,7 @@ export function uploadAttachment(
           return;
         }
         const mime = data.mime_type || data.file_type || file.type || "";
-        const kind: AttachmentKind =
-          (data.message_type as AttachmentKind) || kindFromMime(mime);
+        const kind: AttachmentKind = (data.message_type as AttachmentKind) || kindFromMime(mime);
         const url = data.file_url || data.url || buildFileUrl(fileId);
         resolve({
           id: fileId,

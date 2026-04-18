@@ -73,7 +73,8 @@ export function mapToChatMessage(raw: any, currentUserId: string | number): Chat
   if (f && typeof f === "object") {
     // Already in the normalized shape (ish)
     const fid = String(f.id ?? f.file_id ?? "");
-    const url = f.url || (f.file_url as string) || (fid ? buildFileUrl(fid) : "");
+    const rawUrl = f.url || (f.file_url as string) || "";
+    const url = rawUrl ? resolveFileUrl(rawUrl) : (fid ? resolveFileUrl(fid) : "");
     if (url || fid) {
       file = {
         id: fid,
@@ -87,7 +88,7 @@ export function mapToChatMessage(raw: any, currentUserId: string | number): Chat
   } else if (raw.file_id || raw.file_url) {
     // Flat attachment fields on the message
     const fid = String(raw.file_id ?? "");
-    const url = raw.file_url || (fid ? buildFileUrl(fid) : "");
+    const url = raw.file_url ? resolveFileUrl(raw.file_url) : (fid ? resolveFileUrl(fid) : "");
     file = {
       id: fid,
       name: raw.file_name || "file",

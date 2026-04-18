@@ -4,7 +4,7 @@
 // We tolerate small variations in the response shape and always return a
 // ChatAttachment ready to be embedded in a ChatMessage.
 
-import { buildFileUrl, kindFromMime, type AttachmentKind, type ChatAttachment } from "./chatMessage";
+import { resolveFileUrl, kindFromMime, type AttachmentKind, type ChatAttachment } from "./chatMessage";
 
 const UPLOAD_URL = "https://ngrchatbot.whindia.in/chat/upload_file/";
 

@@ -49,9 +49,7 @@ function formatDateLabel(dateStr?: string): string {
 function DateSeparator({ label }: { label: string }) {
   return (
     <div className="flex justify-center my-3">
-      <span className="text-xs px-3 py-1 rounded-lg bg-muted text-muted-foreground shadow-sm">
-        {label}
-      </span>
+      <span className="text-xs px-3 py-1 rounded-lg bg-muted text-muted-foreground shadow-sm">{label}</span>
     </div>
   );
 }
@@ -73,7 +71,10 @@ export default function ChatMessages({
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    if (!chatId) { setApiMessages([]); return; }
+    if (!chatId) {
+      setApiMessages([]);
+      return;
+    }
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -89,7 +90,9 @@ export default function ChatMessages({
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [chatId, currentUserId]);
 
   useEffect(() => {
@@ -102,8 +105,8 @@ export default function ChatMessages({
   // from the local optimistic copy until the server message lands.
   const merged: ChatMessage[] = (() => {
     const map = new Map<string, ChatMessage>();
-    apiMessages.forEach(m => map.set(m.id, m));
-    localMessages.forEach(m => {
+    apiMessages.forEach((m) => map.set(m.id, m));
+    localMessages.forEach((m) => {
       const existing = map.get(m.id);
       if (!existing) {
         map.set(m.id, m);
@@ -118,9 +121,17 @@ export default function ChatMessages({
         upload_error: m.upload_error ?? null,
       });
     });
-    return Array.from(map.values()).sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-    );
+    // return Array.from(map.values()).sort(
+    //   (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    // );
+    return Array.from(map.values()).sort((a, b) => {
+      const ta = new Date(a.created_at).getTime();
+      const tb = new Date(b.created_at).getTime();
+
+      if (ta !== tb) return ta - tb;
+
+      return String(a.id).localeCompare(String(b.id));
+    });
   })();
 
   const handleContextMenu = useCallback((e: React.MouseEvent, msg: ChatMessage) => {
@@ -204,27 +215,28 @@ export default function ChatMessages({
           }`}
         >
           {m.reply_to && !m.deleted && (
-            <div className={`mb-[5px] rounded-[4px] border-l-[3px] cursor-pointer overflow-hidden ${
-              hasFile ? "mx-[3px] mt-[3px]" : ""
-            } ${isMe ? "bg-[#ffffff1a] border-white/60" : "bg-[#3390ec0d] border-[#3390ec]"}`}>
+            <div
+              className={`mb-[5px] rounded-[4px] border-l-[3px] cursor-pointer overflow-hidden ${
+                hasFile ? "mx-[3px] mt-[3px]" : ""
+              } ${isMe ? "bg-[#ffffff1a] border-white/60" : "bg-[#3390ec0d] border-[#3390ec]"}`}
+            >
               <div className="px-[7px] py-[4px]">
                 <p className={`text-[12px] font-semibold leading-tight ${isMe ? "text-white" : "text-[#3390ec]"}`}>
                   {m.reply_to.sender}
                 </p>
-                <p className={`text-[12px] leading-tight line-clamp-1 mt-[1px] ${
-                  isMe ? "text-white/70" : "text-[#000000]/50"
-                }`}>{m.reply_to.text}</p>
+                <p
+                  className={`text-[12px] leading-tight line-clamp-1 mt-[1px] ${
+                    isMe ? "text-white/70" : "text-[#000000]/50"
+                  }`}
+                >
+                  {m.reply_to.text}
+                </p>
               </div>
             </div>
           )}
 
           {hasFile && m.file && (
-            <Attachment
-              file={m.file}
-              isMe={isMe}
-              uploading={m.uploading}
-              uploadError={m.upload_error}
-            />
+            <Attachment file={m.file} isMe={isMe} uploading={m.uploading} uploadError={m.upload_error} />
           )}
 
           {(!hasFile || hasCaption) && !m.deleted && hasText && (
@@ -235,14 +247,16 @@ export default function ChatMessages({
           {m.deleted && <span className="break-words whitespace-pre-wrap">{text}</span>}
 
           {!m.deleted && (
-            <span className={`text-[11px] float-right leading-[1.6] ${
-              hasFile && !hasCaption ? "px-[9px] pb-[4px] mt-0" : "mt-[2px] ml-3"
-            } ${isMe ? "text-primary-foreground/70" : "text-muted-foreground/60"}`}>
+            <span
+              className={`text-[11px] float-right leading-[1.6] ${
+                hasFile && !hasCaption ? "px-[9px] pb-[4px] mt-0" : "mt-[2px] ml-3"
+              } ${isMe ? "text-primary-foreground/70" : "text-muted-foreground/60"}`}
+            >
               {formatTime(m.created_at)}
             </span>
           )}
         </div>
-      </div>
+      </div>,
     );
   });
 
@@ -261,8 +275,7 @@ export default function ChatMessages({
                 <MessageCircle className="h-8 w-8 text-primary" />
               </div>
               <p className="text-muted-foreground text-sm">
-                Start a conversation with{" "}
-                <span className="font-medium text-foreground">{selectedUsername}</span>
+                Start a conversation with <span className="font-medium text-foreground">{selectedUsername}</span>
               </p>
             </div>
           </div>
@@ -304,8 +317,11 @@ export default function ChatMessages({
       )}
 
       {deleteConfirm && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-foreground/40" onClick={() => setDeleteConfirm(null)}>
-          <div className="bg-card rounded-2xl p-5 w-72 shadow-xl" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-foreground/40"
+          onClick={() => setDeleteConfirm(null)}
+        >
+          <div className="bg-card rounded-2xl p-5 w-72 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <p className="text-sm font-semibold text-foreground mb-4">Delete Message?</p>
             <div className="space-y-2">
               <button

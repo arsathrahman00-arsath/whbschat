@@ -120,37 +120,41 @@ export default function Chat() {
 
   const currentUserId = session?.userId || session?.id;
 
-  useEffect(() => { messagesByUserRef.current = messagesByUser; }, [messagesByUser]);
-  useEffect(() => { selectedUserRef.current = selectedUser; }, [selectedUser]);
+  useEffect(() => {
+    messagesByUserRef.current = messagesByUser;
+  }, [messagesByUser]);
+  useEffect(() => {
+    selectedUserRef.current = selectedUser;
+  }, [selectedUser]);
 
-  const messages = selectedUser ? (messagesByUser[String(selectedUser.id)] || []) : [];
+  const messages = selectedUser ? messagesByUser[String(selectedUser.id)] || [] : [];
 
   /** Append a normalized message to a conversation, dedup by id. */
   const appendMessage = useCallback((peerId: string | number, msg: ChatMessage) => {
-    setMessagesByUser(prev => {
+    setMessagesByUser((prev) => {
       const key = String(peerId);
       const existing = prev[key] || [];
-      if (existing.some(m => m.id === msg.id)) return prev;
+      if (existing.some((m) => m.id === msg.id)) return prev;
       return { ...prev, [key]: [...existing, msg] };
     });
   }, []);
 
   /** Patch an existing message (e.g. swap temp id → real id). */
   const patchMessage = useCallback((peerId: string | number, msgId: string, patch: Partial<ChatMessage>) => {
-    setMessagesByUser(prev => {
+    setMessagesByUser((prev) => {
       const key = String(peerId);
       const list = prev[key];
       if (!list) return prev;
-      return { ...prev, [key]: list.map(m => (m.id === msgId ? { ...m, ...patch } : m)) };
+      return { ...prev, [key]: list.map((m) => (m.id === msgId ? { ...m, ...patch } : m)) };
     });
   }, []);
 
   const removeMessage = useCallback((peerId: string | number, msgId: string) => {
-    setMessagesByUser(prev => {
+    setMessagesByUser((prev) => {
       const key = String(peerId);
       const list = prev[key];
       if (!list) return prev;
-      return { ...prev, [key]: list.filter(m => m.id !== msgId) };
+      return { ...prev, [key]: list.filter((m) => m.id !== msgId) };
     });
   }, []);
 
@@ -180,7 +184,7 @@ export default function Chat() {
         console.log("[WS] received", data);
 
         if (data.type === "user_status") {
-          setUserStatuses(prev => ({
+          setUserStatuses((prev) => ({
             ...prev,
             [String(data.user_id)]: {
               status: data.status === "Active" ? "Active" : "Offline",
@@ -192,10 +196,10 @@ export default function Chat() {
 
         if (data.type === "message_deleted") {
           const deletedId = String(data.message_id);
-          setMessagesByUser(prev => {
+          setMessagesByUser((prev) => {
             const updated: typeof prev = {};
             for (const key of Object.keys(prev)) {
-              updated[key] = prev[key].map(m =>
+              updated[key] = prev[key].map((m) =>
                 m.id === deletedId ? { ...m, deleted: true, message: "This message was deleted" } : m,
               );
             }
@@ -228,18 +232,20 @@ export default function Chat() {
         console.log("[WS] chat_message", { isFromMe, peerKey, incoming });
 
         if (isFromMe) {
-          setMessagesByUser(prev => {
+          setMessagesByUser((prev) => {
             const list = prev[peerKey] || [];
             // if exact server id already exists, do nothing
-            if (list.some(m => m.id === incoming.id)) return prev;
+            if (list.some((m) => m.id === incoming.id)) return prev;
             // replace latest tmp message if possible
-            const tmpIdx = [...list].reverse().findIndex(m => m.id.startsWith("tmp-"));
+            const tmpIdx = [...list].reverse().findIndex((m) => m.id.startsWith("tmp-"));
             if (tmpIdx !== -1) {
               const realIdx = list.length - 1 - tmpIdx;
               const next = [...list];
               next[realIdx] = {
                 ...next[realIdx],
                 ...incoming,
+                // keep optimistic created_at so ordering does not jump during live update
+                created_at: next[realIdx].created_at || incoming.created_at,
                 file: incoming.file ?? next[realIdx].file ?? null,
                 reply_to: incoming.reply_to ?? next[realIdx].reply_to ?? null,
                 uploading: false,
@@ -254,14 +260,15 @@ export default function Chat() {
 
         // Incoming from peer
         const senderName =
-          data.sender_name ||
-          usersRef.current.find(u => String(u.id) === senderId)?.username ||
-          "User";
+          data.sender_name || usersRef.current.find((u) => String(u.id) === senderId)?.username || "User";
 
         if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
           const body = incoming.message || (incoming.file ? `📎 ${incoming.file.name}` : "");
           const n = new Notification(senderName, { body, icon: "/logo.png" });
-          n.onclick = () => { window.focus(); n.close(); };
+          n.onclick = () => {
+            window.focus();
+            n.close();
+          };
         }
 
         appendMessage(peerKey, incoming);
@@ -280,7 +287,10 @@ export default function Chat() {
   }, [currentUserId, appendMessage]);
 
   useEffect(() => {
-    if (!session) { navigate("/login"); return; }
+    if (!session) {
+      navigate("/login");
+      return;
+    }
     fetchUsers();
     connectWebSocket();
     if ("Notification" in window && Notification.permission === "default") {
@@ -313,8 +323,9 @@ export default function Chat() {
         username: u.user_name || u.username || u.name || `User ${u.id}`,
         user_code: u.user_code,
       }));
-      if (currentUserId) userList = userList.filter(u => String(u.id) !== String(currentUserId));
-      if (session?.username) userList = userList.filter(u => u.username.toLowerCase() !== session.username.toLowerCase());
+      if (currentUserId) userList = userList.filter((u) => String(u.id) !== String(currentUserId));
+      if (session?.username)
+        userList = userList.filter((u) => u.username.toLowerCase() !== session.username.toLowerCase());
       setUsers(userList);
     } catch (err) {
       console.error("Failed to fetch users:", err);
@@ -379,7 +390,10 @@ export default function Chat() {
     setInput("");
     setReplyTo(null);
     setPreviewFile(null);
-    if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
 
     let attachment: ChatAttachment | null = null;
 
@@ -418,7 +432,10 @@ export default function Chat() {
 
   const handlePickFile = (file: File | null) => {
     if (!file) return;
-    if (file.size > 50 * 1024 * 1024) { toast.error("File too large (max 50MB)"); return; }
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("File too large (max 50MB)");
+      return;
+    }
     setPreviewFile(file);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     const kind = kindFromMime(file.type);
@@ -427,7 +444,10 @@ export default function Chat() {
 
   const cancelPreview = () => {
     setPreviewFile(null);
-    if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
   };
 
   // Drag & drop
@@ -437,11 +457,16 @@ export default function Chat() {
     dragCounterRef.current += 1;
     if (e.dataTransfer.types.includes("Files")) setIsDragging(true);
   };
-  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); };
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     dragCounterRef.current -= 1;
-    if (dragCounterRef.current <= 0) { dragCounterRef.current = 0; setIsDragging(false); }
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDragging(false);
+    }
   };
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -456,12 +481,14 @@ export default function Chat() {
 
   const handleForwardSend = (targetUserIds: (string | number)[]) => {
     if (!forwardMsg || wsRef.current?.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(JSON.stringify({
-      type: "forward_message",
-      sender_id: currentUserId,
-      message: forwardMsg.text,
-      target_user_ids: targetUserIds,
-    }));
+    wsRef.current.send(
+      JSON.stringify({
+        type: "forward_message",
+        sender_id: currentUserId,
+        message: forwardMsg.text,
+        target_user_ids: targetUserIds,
+      }),
+    );
     setForwardMsg(null);
   };
 
@@ -469,10 +496,10 @@ export default function Chat() {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "delete_message", message_id: msg.id }));
     }
-    setMessagesByUser(prev => {
+    setMessagesByUser((prev) => {
       const updated: typeof prev = {};
       for (const key of Object.keys(prev)) {
-        updated[key] = prev[key].map(m =>
+        updated[key] = prev[key].map((m) =>
           m.id === msg.id ? { ...m, deleted: true, message: "This message was deleted" } : m,
         );
       }
@@ -481,7 +508,10 @@ export default function Chat() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   const handleLogout = () => {
@@ -490,7 +520,7 @@ export default function Chat() {
     navigate("/login");
   };
 
-  const filteredUsers = users.filter(u => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredUsers = users.filter((u) => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
   const selectedUserStatusInfo = selectedUser
     ? userStatuses[String(selectedUser.id)] || { status: "Offline" as const, last_seen: null }
     : undefined;
@@ -499,15 +529,25 @@ export default function Chat() {
   return (
     <div className="flex h-screen bg-white overflow-hidden">
       {/* Sidebar */}
-      <div className={`${sidebarOpen ? "w-80" : "w-0"} md:w-80 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col transition-all duration-200 overflow-hidden`}>
+      <div
+        className={`${sidebarOpen ? "w-80" : "w-0"} md:w-80 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col transition-all duration-200 overflow-hidden`}
+      >
         <div className="h-16 px-4 flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-[#1E90FF] to-[#22C55E]">
           <div className="flex items-center gap-2">
             <img src={logo} alt="WH-Chat" className="h-8 w-8 rounded-lg object-contain" />
             <span className="font-semibold text-white text-lg">WH-Chat</span>
           </div>
           <div className="flex items-center gap-1">
-            {!wsConnected && <div className="p-2 text-yellow-200" title="Reconnecting..."><WifiOff className="h-4 w-4" /></div>}
-            <button onClick={handleLogout} className="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors" title="Logout">
+            {!wsConnected && (
+              <div className="p-2 text-yellow-200" title="Reconnecting...">
+                <WifiOff className="h-4 w-4" />
+              </div>
+            )}
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              title="Logout"
+            >
               <LogOut className="h-5 w-5" />
             </button>
           </div>
@@ -516,15 +556,20 @@ export default function Chat() {
         <div className="p-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input type="text" placeholder="Search users..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-9 pr-3 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1E90FF] focus:ring-1 focus:ring-[#1E90FF]/30 transition-colors" />
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-10 pl-9 pr-3 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#1E90FF] focus:ring-1 focus:ring-[#1E90FF]/30 transition-colors"
+            />
           </div>
         </div>
 
         <ScrollArea className="flex-1">
           {loadingUsers ? (
             <div className="p-4 space-y-3">
-              {[1, 2, 3].map(i => (
+              {[1, 2, 3].map((i) => (
                 <div key={i} className="flex items-center gap-3 animate-pulse">
                   <div className="h-11 w-11 rounded-full bg-gray-200" />
                   <div className="h-3 w-24 bg-gray-200 rounded" />
@@ -538,24 +583,33 @@ export default function Chat() {
             </div>
           ) : (
             <div className="p-2 space-y-0.5">
-              {filteredUsers.map(user => (
-                <button key={user.id} onClick={() => handleSelectUser(user)}
+              {filteredUsers.map((user) => (
+                <button
+                  key={user.id}
+                  onClick={() => handleSelectUser(user)}
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all active:scale-[0.98] ${
                     selectedUser?.id === user.id ? "bg-[#8B5CF6]/10 border border-[#8B5CF6]/20" : "hover:bg-gray-50"
-                  }`}>
+                  }`}
+                >
                   <Avatar className="h-11 w-11">
-                    <AvatarFallback className={`bg-gradient-to-br ${getAvatarColor(user.username)} text-white text-sm font-semibold`}>
+                    <AvatarFallback
+                      className={`bg-gradient-to-br ${getAvatarColor(user.username)} text-white text-sm font-semibold`}
+                    >
                       {getInitials(user.username)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${selectedUser?.id === user.id ? "text-[#8B5CF6]" : "text-gray-900"}`}>
+                    <p
+                      className={`text-sm font-medium truncate ${selectedUser?.id === user.id ? "text-[#8B5CF6]" : "text-gray-900"}`}
+                    >
                       {user.username}
                     </p>
                     {(() => {
                       const s = formatStatusDisplay(userStatuses[String(user.id)]);
                       return s.text ? (
-                        <p className={`text-xs flex items-center gap-1 ${s.isActive ? "text-green-500" : "text-muted-foreground"}`}>
+                        <p
+                          className={`text-xs flex items-center gap-1 ${s.isActive ? "text-green-500" : "text-muted-foreground"}`}
+                        >
                           {s.isActive && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />}
                           {s.text}
                         </p>
@@ -600,19 +654,28 @@ export default function Chat() {
         {selectedUser ? (
           <>
             <div className="h-16 px-4 md:px-6 flex items-center gap-3 border-b border-gray-200 bg-white">
-              <button onClick={() => setSidebarOpen(true)} className="md:hidden p-1 rounded-lg text-gray-500 hover:bg-gray-100">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="md:hidden p-1 rounded-lg text-gray-500 hover:bg-gray-100"
+              >
                 <MessageCircle className="h-5 w-5" />
               </button>
               <Avatar className="h-10 w-10">
-                <AvatarFallback className={`bg-gradient-to-br ${getAvatarColor(selectedUser.username)} text-white text-sm font-semibold`}>
+                <AvatarFallback
+                  className={`bg-gradient-to-br ${getAvatarColor(selectedUser.username)} text-white text-sm font-semibold`}
+                >
                   {getInitials(selectedUser.username)}
                 </AvatarFallback>
               </Avatar>
               <div>
                 <p className="text-base font-semibold text-gray-900">{selectedUser.username}</p>
                 {selectedStatusDisplay.text && (
-                  <p className={`text-xs flex items-center gap-1 ${selectedStatusDisplay.isActive ? "text-green-500" : "text-muted-foreground"}`}>
-                    {selectedStatusDisplay.isActive && <span className="inline-block h-2 w-2 rounded-full bg-green-500" />}
+                  <p
+                    className={`text-xs flex items-center gap-1 ${selectedStatusDisplay.isActive ? "text-green-500" : "text-muted-foreground"}`}
+                  >
+                    {selectedStatusDisplay.isActive && (
+                      <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                    )}
                     {selectedStatusDisplay.text}
                   </p>
                 )}
@@ -639,7 +702,10 @@ export default function Chat() {
                       </p>
                       <p className="text-[13px] text-[#707579] truncate leading-tight">{replyTo.text}</p>
                     </div>
-                    <button onClick={() => setReplyTo(null)} className="p-1 rounded-full text-[#707579] hover:text-[#3390ec] hover:bg-black/5 transition-colors">
+                    <button
+                      onClick={() => setReplyTo(null)}
+                      className="p-1 rounded-full text-[#707579] hover:text-[#3390ec] hover:bg-black/5 transition-colors"
+                    >
                       <X className="h-4 w-4" />
                     </button>
                   </div>
@@ -650,7 +716,11 @@ export default function Chat() {
                 <div className="mb-[5px]">
                   <div className="flex items-center gap-3 px-3 py-[8px] rounded-xl bg-white/90 border border-gray-200 shadow-sm animate-fade-in">
                     {previewUrl && kindFromMime(previewFile.type) === "image" ? (
-                      <img src={previewUrl} alt={previewFile.name} className="h-12 w-12 rounded-lg object-cover flex-shrink-0" />
+                      <img
+                        src={previewUrl}
+                        alt={previewFile.name}
+                        className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
+                      />
                     ) : previewUrl && kindFromMime(previewFile.type) === "video" ? (
                       <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-black flex-shrink-0">
                         <video src={previewUrl} className="h-full w-full object-cover" muted />
@@ -665,8 +735,11 @@ export default function Chat() {
                       <p className="text-[13px] font-medium text-gray-900 truncate">{previewFile.name}</p>
                       <p className="text-[12px] text-[#707579]">{formatFileSize(previewFile.size)}</p>
                     </div>
-                    <button onClick={cancelPreview} disabled={isUploading}
-                      className="p-1 rounded-full text-[#707579] hover:text-destructive hover:bg-black/5 transition-colors disabled:opacity-40">
+                    <button
+                      onClick={cancelPreview}
+                      disabled={isUploading}
+                      className="p-1 rounded-full text-[#707579] hover:text-destructive hover:bg-black/5 transition-colors disabled:opacity-40"
+                    >
                       <X className="h-4 w-4" />
                     </button>
                   </div>
@@ -679,7 +752,10 @@ export default function Chat() {
                   type="file"
                   className="hidden"
                   accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt"
-                  onChange={(e) => { handlePickFile(e.target.files?.[0] || null); e.target.value = ""; }}
+                  onChange={(e) => {
+                    handlePickFile(e.target.files?.[0] || null);
+                    e.target.value = "";
+                  }}
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -691,13 +767,21 @@ export default function Chat() {
                 </button>
 
                 <div className="flex-1 flex items-end bg-white rounded-[21px] shadow-sm min-h-[42px]">
-                  <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
                     placeholder={previewFile ? "Add a caption…" : "Message"}
-                    className="flex-1 bg-transparent px-[14px] py-[9px] text-[15px] text-[#000000] placeholder:text-[#a2acb4] focus:outline-none leading-[22px]" />
+                    className="flex-1 bg-transparent px-[14px] py-[9px] text-[15px] text-[#000000] placeholder:text-[#a2acb4] focus:outline-none leading-[22px]"
+                  />
                 </div>
-                {(input.trim() || previewFile) ? (
-                  <button onClick={handleSend} disabled={!wsConnected || isUploading}
-                    className="h-[42px] w-[42px] rounded-full bg-[#3390ec] text-white flex items-center justify-center hover:bg-[#2b7ed8] active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none flex-shrink-0 shadow-sm">
+                {input.trim() || previewFile ? (
+                  <button
+                    onClick={handleSend}
+                    disabled={!wsConnected || isUploading}
+                    className="h-[42px] w-[42px] rounded-full bg-[#3390ec] text-white flex items-center justify-center hover:bg-[#2b7ed8] active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none flex-shrink-0 shadow-sm"
+                  >
                     <Send className="h-5 w-5 ml-[1px]" />
                   </button>
                 ) : (
@@ -710,7 +794,10 @@ export default function Chat() {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gray-50">
-            <button onClick={() => setSidebarOpen(true)} className="md:hidden absolute top-4 left-4 p-2 rounded-lg text-gray-500 hover:bg-gray-100">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden absolute top-4 left-4 p-2 rounded-lg text-gray-500 hover:bg-gray-100"
+            >
               <MessageCircle className="h-5 w-5" />
             </button>
             <div className="text-center">

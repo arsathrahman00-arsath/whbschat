@@ -241,6 +241,14 @@ export default function Chat() {
             if (tmpIdx !== -1) {
               const realIdx = list.length - 1 - tmpIdx;
               const next = [...list];
+              // next[realIdx] = {
+              //   ...next[realIdx],
+              //   ...incoming,
+              //   file: incoming.file ?? next[realIdx].file ?? null,
+              //   reply_to: incoming.reply_to ?? next[realIdx].reply_to ?? null,
+              //   uploading: false,
+              //   upload_error: null,
+              // };
               next[realIdx] = {
                 ...next[realIdx],
                 ...incoming,

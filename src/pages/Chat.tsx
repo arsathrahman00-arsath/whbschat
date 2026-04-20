@@ -212,25 +212,59 @@ export default function Chat() {
         const incoming = mapToChatMessage(data, currentUserId);
 
         if (isFromMe) {
-          // Reconcile with optimistic temp message: match by file.id or text
+          // Reconcile with optimistic temp message.
+          // Match priority: real id → file.id → text+recent timestamp.
           setMessagesByUser(prev => {
             const list = prev[peerKey];
             if (!list) return { ...prev, [peerKey]: [incoming] };
-            if (list.some(m => m.id === incoming.id)) return prev;
+            // Already have this exact server id — just patch (covers race where
+            // history fetch already inserted it).
+            const existingRealIdx = list.findIndex(m => m.id === incoming.id);
+            if (existingRealIdx !== -1) {
+              const next = [...list];
+              const prevMsg = next[existingRealIdx];
+              next[existingRealIdx] = {
+                ...prevMsg,
+                ...incoming,
+                // Preserve file/reply_to if server payload omitted them
+                file: incoming.file ?? prevMsg.file ?? null,
+                reply_to: incoming.reply_to ?? prevMsg.reply_to ?? null,
+                uploading: false,
+                upload_error: null,
+              };
+              return { ...prev, [peerKey]: next };
+            }
 
+            const incomingTime = new Date(incoming.created_at).getTime();
             const idx = (() => {
               for (let i = list.length - 1; i >= 0; i--) {
                 const m = list[i];
                 if (!m.id.startsWith("tmp-")) continue;
-                if (incoming.file && m.file && m.file.id && incoming.file.id === m.file.id) return i;
+                // File match (most reliable for attachments)
+                if (incoming.file && m.file && m.file.id && incoming.file.id && incoming.file.id === m.file.id) return i;
+                // Both attachment-less and same text within 30s
                 if (!incoming.file && !m.file && incoming.message && m.message === incoming.message) return i;
+                // Caption+file: match by text when file metadata missing on one side
+                if (incoming.message && m.message === incoming.message && (m.file || incoming.file)) {
+                  const t = new Date(m.created_at).getTime();
+                  if (Math.abs(incomingTime - t) < 30000) return i;
+                }
               }
               return -1;
             })();
 
             if (idx === -1) return { ...prev, [peerKey]: [...list, incoming] };
             const next = [...list];
-            next[idx] = { ...next[idx], ...incoming, uploading: false, upload_error: null };
+            const prevMsg = next[idx];
+            next[idx] = {
+              ...prevMsg,
+              ...incoming,
+              // Keep our resolved attachment if server omitted file in broadcast
+              file: incoming.file ?? prevMsg.file ?? null,
+              reply_to: incoming.reply_to ?? prevMsg.reply_to ?? null,
+              uploading: false,
+              upload_error: null,
+            };
             return { ...prev, [peerKey]: next };
           });
           return;

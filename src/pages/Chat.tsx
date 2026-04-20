@@ -204,15 +204,28 @@ export default function Chat() {
           return;
         }
 
-        if (data.type !== "chat_message") return;
+        // Accept the canonical "chat_message" plus a few common backend
+        // variants. Also accept any payload that has both sender_id and
+        // (message OR file) — that's a chat message regardless of the label.
+        const looksLikeChatMessage =
+          data.type === "chat_message" ||
+          data.type === "new_message" ||
+          data.type === "message" ||
+          (data.sender_id != null && (data.message != null || data.file != null || data.file_id != null));
+
+        if (!looksLikeChatMessage) {
+          console.log("[WS] ignored frame (unknown type)", data.type);
+          return;
+        }
 
         const senderId = String(data.sender_id);
-        const receiverId = String(data.receiver_id);
+        const receiverId = String(data.receiver_id ?? "");
         const isFromMe = senderId === String(currentUserId);
         // Conversation key is the peer (the other user)
         const peerKey = isFromMe ? receiverId : senderId;
 
         const incoming = mapToChatMessage(data, currentUserId);
+        console.log("[WS] chat_message", { isFromMe, peerKey, incoming });
 
         if (isFromMe) {
           // Reconcile with optimistic temp message.

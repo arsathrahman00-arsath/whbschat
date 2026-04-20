@@ -96,13 +96,27 @@ export default function ChatMessages({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [apiMessages, localMessages]);
 
-  // Merge: API first, then local — local wins on duplicate id.
+  // Merge: API first, then local — local wins on duplicate id, but we
+  // preserve `file` and `reply_to` from whichever copy has them (server
+  // broadcasts sometimes omit them) and keep `uploading`/`upload_error`
+  // from the local optimistic copy until the server message lands.
   const merged: ChatMessage[] = (() => {
     const map = new Map<string, ChatMessage>();
     apiMessages.forEach(m => map.set(m.id, m));
     localMessages.forEach(m => {
       const existing = map.get(m.id);
-      map.set(m.id, existing ? { ...existing, ...m } : m);
+      if (!existing) {
+        map.set(m.id, m);
+        return;
+      }
+      map.set(m.id, {
+        ...existing,
+        ...m,
+        file: m.file ?? existing.file ?? null,
+        reply_to: m.reply_to ?? existing.reply_to ?? null,
+        uploading: m.uploading ?? false,
+        upload_error: m.upload_error ?? null,
+      });
     });
     return Array.from(map.values()).sort(
       (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),

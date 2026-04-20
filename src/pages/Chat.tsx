@@ -175,6 +175,9 @@ export default function Chat() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        // Debug: surface every WS frame so we can see what the backend sends.
+        // eslint-disable-next-line no-console
+        console.log("[WS] received", data);
 
         if (data.type === "user_status") {
           setUserStatuses(prev => ({

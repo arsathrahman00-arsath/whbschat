@@ -13,7 +13,7 @@ interface ChatMessagesProps {
   /** Already-normalized live messages (optimistic + WS) for this conversation. */
   localMessages: ChatMessage[];
   onReply?: (msg: { id: string; text: string; isMe: boolean }) => void;
-  onForward?: (msg: { text: string }) => void;
+  onForward?: (msg: { id: string; text: string; file: ChatMessage["file"] }) => void;
   onDelete?: (msg: { id: string; isMe: boolean }) => void;
 }
 

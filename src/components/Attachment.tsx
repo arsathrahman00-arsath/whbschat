@@ -82,7 +82,7 @@ export default function Attachment({ file, isMe, uploading, uploadError }: Attac
   if (file.message_type === "video") {
     return (
       <>
-        <div className="relative max-w-[260px] animate-fade-in">
+        <div className="relative max-w-[260px] animate-fade-in group">
           <div
             onClick={() => !uploading && !uploadError && file.url && setVideoOpen(true)}
             className="relative rounded-[14px] overflow-hidden bg-black cursor-pointer aspect-video"
@@ -100,6 +100,19 @@ export default function Attachment({ file, isMe, uploading, uploadError }: Attac
               </div>
             )}
           </div>
+          {!uploading && !uploadError && file.url && (
+            <a
+              href={file.url}
+              download={file.name}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-2 right-2 p-1.5 rounded-full bg-black/55 text-white hover:bg-black/75 transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100 z-10"
+              aria-label="Download video"
+            >
+              <Download className="h-4 w-4" />
+            </a>
+          )}
           {stateOverlay}
         </div>
         {videoOpen && file.url && (

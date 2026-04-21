@@ -46,6 +46,15 @@ function formatDateLabel(dateStr?: string): string {
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 }
 
+function toProperCase(str?: string): string {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .split(/(\s+)/)
+    .map((part) => (part.trim().length === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)))
+    .join("");
+}
+
 function DateSeparator({ label }: { label: string }) {
   return (
     <div className="flex justify-center my-3">

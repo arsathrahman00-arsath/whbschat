@@ -301,7 +301,12 @@ export default function ChatMessages({
             setContextMenu(null);
           }}
           onForward={() => {
-            if (onForward) onForward({ text: contextMenu.msg.message || "" });
+            if (onForward)
+              onForward({
+                id: contextMenu.msg.id,
+                text: contextMenu.msg.message || "",
+                file: contextMenu.msg.file || null,
+              });
             setContextMenu(null);
           }}
           onCopy={() => {

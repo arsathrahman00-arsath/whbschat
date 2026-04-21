@@ -13,7 +13,7 @@ interface ChatMessagesProps {
   /** Already-normalized live messages (optimistic + WS) for this conversation. */
   localMessages: ChatMessage[];
   onReply?: (msg: { id: string; text: string; isMe: boolean }) => void;
-  onForward?: (msg: { text: string }) => void;
+  onForward?: (msg: { id: string; text: string; file: ChatMessage["file"] }) => void;
   onDelete?: (msg: { id: string; isMe: boolean }) => void;
 }
 
@@ -301,7 +301,12 @@ export default function ChatMessages({
             setContextMenu(null);
           }}
           onForward={() => {
-            if (onForward) onForward({ text: contextMenu.msg.message || "" });
+            if (onForward)
+              onForward({
+                id: contextMenu.msg.id,
+                text: contextMenu.msg.message || "",
+                file: contextMenu.msg.file || null,
+              });
             setContextMenu(null);
           }}
           onCopy={() => {

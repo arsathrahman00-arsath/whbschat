@@ -92,7 +92,7 @@ export default function Chat() {
   const [wsConnected, setWsConnected] = useState(false);
   const [chatId, setChatId] = useState<string | number | null>(null);
   const [replyTo, setReplyTo] = useState<ReplyTo | null>(null);
-  const [forwardMsg, setForwardMsg] = useState<{ text: string } | null>(null);
+  const [forwardMsg, setForwardMsg] = useState<{ id: string; text: string; file: ChatAttachment | null } | null>(null);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -485,15 +485,20 @@ export default function Chat() {
   };
 
   const handleReply = (msg: { id: string; text: string; isMe: boolean }) => setReplyTo(msg);
-  const handleForwardRequest = (msg: { text: string }) => setForwardMsg(msg);
+  const handleForwardRequest = (msg: { id: string; text: string; file: ChatAttachment | null }) =>
+    setForwardMsg(msg);
 
   const handleForwardSend = (targetUserIds: (string | number)[]) => {
     if (!forwardMsg || wsRef.current?.readyState !== WebSocket.OPEN) return;
+    const text = forwardMsg.text || "";
+    const fileId = forwardMsg.file?.id || null;
+    if (!text && !fileId) return;
     wsRef.current.send(
       JSON.stringify({
         type: "forward_message",
         sender_id: currentUserId,
-        message: forwardMsg.text,
+        message: text,
+        file_id: fileId,
         target_user_ids: targetUserIds,
       }),
     );
@@ -823,7 +828,7 @@ export default function Chat() {
         open={!!forwardMsg}
         onClose={() => setForwardMsg(null)}
         users={users}
-        messageText={forwardMsg?.text || ""}
+        messageText={forwardMsg?.text || (forwardMsg?.file ? `📎 ${forwardMsg.file.name}` : "")}
         onForward={handleForwardSend}
       />
     </div>

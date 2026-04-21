@@ -231,7 +231,7 @@ export default function ChatMessages({
             >
               <div className="px-[7px] py-[4px]">
                 <p className={`text-[12px] font-semibold leading-tight ${isMe ? "text-white" : "text-[#3390ec]"}`}>
-                  {m.reply_to.sender}
+                  {toProperCase(m.reply_to.sender)}
                 </p>
                 <p
                   className={`text-[12px] leading-tight line-clamp-1 mt-[1px] ${

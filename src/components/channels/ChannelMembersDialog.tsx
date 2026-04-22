@@ -134,6 +134,7 @@ export default function ChannelMembersDialog({
           onOpenChange={setAddOpen}
           channelId={channelId}
           adminId={adminId}
+          existingMemberIds={members.map((m) => m.user_id)}
           onAdded={load}
         />
       )}

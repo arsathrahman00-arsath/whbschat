@@ -7,15 +7,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Hash, Loader2, WifiOff, MessageCircle } from "lucide-react";
+import { Hash, WifiOff, MessageCircle, Users, UserPlus, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import ChannelSidebar from "@/components/channels/ChannelSidebar";
 import ChannelPosts from "@/components/channels/ChannelPosts";
 import ChannelComposer from "@/components/channels/ChannelComposer";
+import ChannelMembersDialog from "@/components/channels/ChannelMembersDialog";
 import { CHANNEL_ENDPOINTS, channelWsUrl } from "@/lib/channelConfig";
 import { mapToChannel, mapToChannelPost } from "@/lib/channelMappers";
+import { joinChannel } from "@/lib/channelMembersApi";
 import type { Channel, ChannelPost } from "@/lib/channelTypes";
 import type { ChatAttachment } from "@/lib/chatMessage";
 
@@ -43,6 +45,8 @@ export default function ChannelPage() {
   const [postsByChannel, setPostsByChannel] = useState<Record<string, ChannelPost[]>>({});
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [joining, setJoining] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const selectedRef = useRef<Channel | null>(null);
@@ -231,6 +235,21 @@ export default function ChannelPage() {
     [currentUserId, currentUsername],
   );
 
+  const handleJoin = async () => {
+    if (!selected || !currentUserId) return;
+    setJoining(true);
+    try {
+      await joinChannel({ channelId: selected.id, userId: currentUserId });
+      toast.success("Joined channel");
+      // refresh members count / membership flag from server
+      await loadChannels();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to join channel");
+    } finally {
+      setJoining(false);
+    }
+  };
+
   const posts = selected ? postsByChannel[String(selected.id)] || [] : [];
 
   return (
@@ -275,6 +294,34 @@ export default function ChannelPage() {
                   offline
                 </span>
               )}
+              {!selected.is_admin && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleJoin}
+                  disabled={joining}
+                  className="gap-1.5"
+                >
+                  {joining ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <UserPlus className="h-3.5 w-3.5" />
+                  )}
+                  Join
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setMembersOpen(true)}
+                className="gap-1.5"
+                title="View members"
+              >
+                <Users className="h-4 w-4" />
+                {selected.members_count ? (
+                  <span className="text-xs">{selected.members_count}</span>
+                ) : null}
+              </Button>
             </header>
 
             <ChannelPosts posts={posts} loading={loadingPosts && posts.length === 0} />
@@ -283,6 +330,14 @@ export default function ChannelPage() {
               canPost={!!selected.is_admin}
               currentUserId={currentUserId}
               onSend={handleSendPost}
+            />
+
+            <ChannelMembersDialog
+              open={membersOpen}
+              onOpenChange={setMembersOpen}
+              channelId={selected.id}
+              isAdmin={!!selected.is_admin}
+              adminId={currentUserId}
             />
           </>
         )}

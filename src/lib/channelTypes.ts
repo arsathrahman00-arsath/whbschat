@@ -26,3 +26,12 @@ export interface ChannelPost {
   uploading?: boolean;
   upload_error?: string | null;
 }
+
+export type ChannelMemberRole = "admin" | "member";
+
+export interface ChannelMember {
+  user_id: string | number;
+  username: string;
+  role: ChannelMemberRole;
+  joined_at?: string;
+}

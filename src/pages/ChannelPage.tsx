@@ -45,6 +45,8 @@ export default function ChannelPage() {
   const [postsByChannel, setPostsByChannel] = useState<Record<string, ChannelPost[]>>({});
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [joining, setJoining] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const selectedRef = useRef<Channel | null>(null);

@@ -7,15 +7,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Hash, Loader2, WifiOff, MessageCircle } from "lucide-react";
+import { Hash, WifiOff, MessageCircle, Users, UserPlus, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import ChannelSidebar from "@/components/channels/ChannelSidebar";
 import ChannelPosts from "@/components/channels/ChannelPosts";
 import ChannelComposer from "@/components/channels/ChannelComposer";
+import ChannelMembersDialog from "@/components/channels/ChannelMembersDialog";
 import { CHANNEL_ENDPOINTS, channelWsUrl } from "@/lib/channelConfig";
 import { mapToChannel, mapToChannelPost } from "@/lib/channelMappers";
+import { joinChannel } from "@/lib/channelMembersApi";
 import type { Channel, ChannelPost } from "@/lib/channelTypes";
 import type { ChatAttachment } from "@/lib/chatMessage";
 

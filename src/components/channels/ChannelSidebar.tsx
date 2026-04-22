@@ -1,0 +1,177 @@
+// Left sidebar listing channels the user belongs to.
+// Includes a "Create channel" button that opens an inline dialog.
+
+import { useState } from "react";
+import { Plus, Hash, Search, Loader2, ArrowLeft } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import type { Channel } from "@/lib/channelTypes";
+
+interface Props {
+  channels: Channel[];
+  selectedId: string | number | null;
+  loading: boolean;
+  onSelect: (c: Channel) => void;
+  onCreate: (name: string, description: string) => Promise<void>;
+  onBackToChat: () => void;
+}
+
+function getInitials(name: string) {
+  return (name || "C").slice(0, 2).toUpperCase();
+}
+
+export default function ChannelSidebar({
+  channels,
+  selectedId,
+  loading,
+  onSelect,
+  onCreate,
+  onBackToChat,
+}: Props) {
+  const [query, setQuery] = useState("");
+  const [openCreate, setOpenCreate] = useState(false);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const filtered = channels.filter((c) =>
+    c.name.toLowerCase().includes(query.toLowerCase()),
+  );
+
+  const handleCreate = async () => {
+    if (!name.trim()) return;
+    setCreating(true);
+    try {
+      await onCreate(name.trim(), description.trim());
+      setName("");
+      setDescription("");
+      setOpenCreate(false);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <aside className="w-80 border-r bg-card flex flex-col">
+      <div className="px-4 py-3 border-b flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={onBackToChat}
+          title="Back to chats"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h2 className="font-semibold text-foreground flex-1">Channels</h2>
+        <Button size="icon" className="h-8 w-8" onClick={() => setOpenCreate(true)}>
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="px-3 py-2 border-b">
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search channels"
+            className="pl-8 h-9"
+          />
+        </div>
+      </div>
+
+      <ScrollArea className="flex-1">
+        {loading ? (
+          <div className="flex items-center justify-center py-10 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+            No channels yet. Create one to get started.
+          </div>
+        ) : (
+          <ul>
+            {filtered.map((c) => {
+              const active = String(c.id) === String(selectedId);
+              return (
+                <li key={c.id}>
+                  <button
+                    onClick={() => onSelect(c)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/60 transition-colors text-left ${
+                      active ? "bg-muted" : ""
+                    }`}
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-sm">
+                        {getInitials(c.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <Hash className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="font-medium text-sm truncate">{c.name}</span>
+                      </div>
+                      {c.description && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {c.description}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </ScrollArea>
+
+      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create channel</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Name</label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="My Channel"
+                maxLength={64}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Description</label>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What is this channel about?"
+                rows={3}
+                maxLength={280}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenCreate(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={!name.trim() || creating}>
+              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </aside>
+  );
+}

@@ -9,6 +9,9 @@ export const CHANNEL_ENDPOINTS = {
   list: `${HTTP_BASE}/chat/get_channels/`,
   posts: `${HTTP_BASE}/chat/get_channel_posts/`,
   upload: `${HTTP_BASE}/chat/upload_file/`,
+  addMember: `${HTTP_BASE}/chat/add_user_to_channel/`,
+  joinChannel: `${HTTP_BASE}/chat/join_channel/`,
+  members: `${HTTP_BASE}/chat/get_channel_members/`,
 };
 
 export function channelWsUrl(channelId: string | number): string {

@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Hash, WifiOff, MessageCircle, Users, UserPlus, Loader2 } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import ChannelSidebar from "@/components/channels/ChannelSidebar";
@@ -20,6 +20,7 @@ import { mapToChannel, mapToChannelPost } from "@/lib/channelMappers";
 import { joinChannel } from "@/lib/channelMembersApi";
 import type { Channel, ChannelPost } from "@/lib/channelTypes";
 import type { ChatAttachment } from "@/lib/chatMessage";
+import channelImage from "@/assets/channel.jpg";
 
 function readSession() {
   try {
@@ -273,6 +274,7 @@ export default function ChannelPage() {
           <>
             <header className="border-b bg-card px-4 py-3 flex items-center gap-3">
               <Avatar className="h-10 w-10">
+                <AvatarImage src={channelImage} alt={`${selected.name} channel`} className="object-cover" />
                 <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-sm">
                   {initials(selected.name)}
                 </AvatarFallback>

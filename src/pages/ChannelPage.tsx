@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Hash, WifiOff, MessageCircle, Users, UserPlus, Loader2 } from "lucide-react";
+import { WifiOff, MessageCircle, Users, UserPlus, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -21,6 +21,7 @@ import { joinChannel } from "@/lib/channelMembersApi";
 import type { Channel, ChannelPost } from "@/lib/channelTypes";
 import type { ChatAttachment } from "@/lib/chatMessage";
 import channelImage from "@/assets/channel.jpg";
+import channelIcon from "@/assets/channel-icon.jpg";
 
 function readSession() {
   try {
@@ -281,7 +282,7 @@ export default function ChannelPage() {
               </Avatar>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <Hash className="h-4 w-4 text-muted-foreground" />
+                  <img src={channelIcon} alt="" className="h-4 w-4 object-contain" />
                   <h1 className="font-semibold truncate">{selected.name}</h1>
                 </div>
                 {selected.description && (

@@ -2,8 +2,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, LogOut, Search, MessageCircle, WifiOff, X, Smile, Paperclip, FileText, Film, Hash } from "lucide-react";
+import { Send, LogOut, Search, MessageCircle, WifiOff, X, Smile, Paperclip, FileText, Film } from "lucide-react";
 import logo from "@/assets/logo.jpg";
+import channelIcon from "@/assets/channel-icon.jpg";
 import ChatMessages from "@/components/ChatMessages";
 import ForwardModal from "@/components/ForwardModal";
 import { generateChatId } from "@/lib/chatId";
@@ -561,7 +562,7 @@ export default function Chat() {
               className="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
               title="Channels"
             >
-              <Hash className="h-5 w-5" />
+              <img src={channelIcon} alt="" className="h-5 w-5 object-contain" />
             </button>
             <button
               onClick={handleLogout}

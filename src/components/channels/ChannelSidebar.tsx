@@ -2,7 +2,7 @@
 // Includes a "Create channel" button that opens an inline dialog.
 
 import { useState } from "react";
-import { Plus, Hash, Search, Loader2, ArrowLeft } from "lucide-react";
+import { Plus, Search, Loader2, ArrowLeft } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { Channel } from "@/lib/channelTypes";
 import channelImage from "@/assets/channel.jpg";
+import channelIcon from "@/assets/channel-icon.jpg";
 
 interface Props {
   channels: Channel[];
@@ -121,7 +122,7 @@ export default function ChannelSidebar({
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <Hash className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <img src={channelIcon} alt="" className="h-3.5 w-3.5 shrink-0 object-contain" />
                         <span className="font-medium text-sm truncate">{c.name}</span>
                       </div>
                       {c.description && (

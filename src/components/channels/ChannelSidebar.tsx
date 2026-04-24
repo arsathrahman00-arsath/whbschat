@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { Plus, Hash, Search, Loader2, ArrowLeft } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import type { Channel } from "@/lib/channelTypes";
+import channelImage from "@/assets/channel.jpg";
 
 interface Props {
   channels: Channel[];
@@ -113,6 +114,7 @@ export default function ChannelSidebar({
                     }`}
                   >
                     <Avatar className="h-10 w-10">
+                      <AvatarImage src={channelImage} alt={`${c.name} channel`} className="object-cover" />
                       <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-sm">
                         {getInitials(c.name)}
                       </AvatarFallback>

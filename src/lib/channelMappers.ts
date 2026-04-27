@@ -8,7 +8,7 @@ export function mapToChannel(raw: any, currentUserId?: string | number): Channel
   const adminId = raw.admin_id ?? raw.created_by ?? raw.creator_id;
   return {
     id: raw.id ?? raw.channel_id,
-    name: raw.name ?? raw.channel_name ?? "Untitled",
+    name: raw.name ?? raw.channel_name ?? "",
     description: raw.description ?? raw.about ?? null,
     admin_id: adminId,
     admin_name: raw.admin_name ?? raw.creator_name ?? null,

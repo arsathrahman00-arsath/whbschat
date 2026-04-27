@@ -189,7 +189,16 @@ export default function ChannelPage() {
         throw new Error(json?.message || json?.error || `Create failed (${res.status})`);
       }
       const created = json.data || json.channel || json;
-      const ch = mapToChannel(created, currentUserId);
+      // Backend create response often returns only channel_id; merge submitted
+      // form values so the UI shows the correct name/description immediately.
+      const merged = {
+        ...created,
+        id: created.id ?? created.channel_id ?? json.channel_id,
+        name: created.name ?? created.channel_name ?? name,
+        description: created.description ?? created.about ?? description,
+        admin_id: created.admin_id ?? created.created_by ?? currentUserId,
+      };
+      const ch = mapToChannel(merged, currentUserId);
       setChannels((prev) => {
         if (prev.some((c) => String(c.id) === String(ch.id))) return prev;
         return [ch, ...prev];

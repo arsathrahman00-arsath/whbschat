@@ -430,6 +430,29 @@ export default function Chat() {
       if (session?.username)
         userList = userList.filter((u) => u.username.toLowerCase() !== session.username.toLowerCase());
       setUsers(userList);
+
+      // Backend-ready: seed unread/preview/last_message_time if API provides them.
+      const seeded: Record<string, ChatMeta> = {};
+      for (const u of rawList) {
+        const key = String(u.id);
+        if (!key) continue;
+        const ts = u.last_message_time
+          ? new Date(u.last_message_time).getTime() || 0
+          : u.last_message_at
+            ? new Date(u.last_message_at).getTime() || 0
+            : 0;
+        const preview =
+          (typeof u.last_message === "string" && u.last_message) ||
+          (typeof u.last_message_text === "string" && u.last_message_text) ||
+          "";
+        const unread = Number(u.unread_count ?? u.unread ?? 0) || 0;
+        if (ts || preview || unread) {
+          seeded[key] = { lastActivity: ts, lastPreview: preview, unread };
+        }
+      }
+      if (Object.keys(seeded).length) {
+        setChatMetaByUser((prev) => ({ ...seeded, ...prev }));
+      }
     } catch (err) {
       console.error("Failed to fetch users:", err);
     } finally {

@@ -376,7 +376,7 @@ export default function Chat() {
     };
 
     ws.onerror = (err) => console.error("WebSocket error:", err);
-  }, [currentUserId, appendMessage]);
+  }, [currentUserId, appendMessage, bumpMeta]);
 
   useEffect(() => {
     if (!session) {

@@ -250,9 +250,15 @@ export default function ChatMessages({
           )}
 
           {(!hasFile || hasCaption) && !m.deleted && hasText && (
-            <span className={`break-words whitespace-pre-wrap ${hasFile ? "block px-[9px] py-[6px]" : ""}`}>
-              {text}
-            </span>
+            looksLikeHtml(text) ? (
+              <div className={hasFile ? "block px-[9px] py-[6px]" : ""}>
+                <HtmlMessage html={text} isMe={isMe} />
+              </div>
+            ) : (
+              <span className={`break-words whitespace-pre-wrap ${hasFile ? "block px-[9px] py-[6px]" : ""}`}>
+                {text}
+              </span>
+            )
           )}
           {m.deleted && <span className="break-words whitespace-pre-wrap">{text}</span>}
 

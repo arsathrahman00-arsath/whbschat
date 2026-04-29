@@ -256,6 +256,25 @@ export default function Chat() {
           return;
         }
 
+        // Backend-ready hook: server may push authoritative unread/preview updates.
+        if (data.type === "unread_update" && data.user_id != null) {
+          const peerKey = String(data.user_id);
+          setChatMetaByUser((prev) => {
+            const cur = prev[peerKey] || { lastActivity: 0, lastPreview: "", unread: 0 };
+            return {
+              ...prev,
+              [peerKey]: {
+                lastActivity: data.last_message_time
+                  ? new Date(data.last_message_time).getTime() || cur.lastActivity
+                  : cur.lastActivity,
+                lastPreview: typeof data.last_message === "string" ? data.last_message : cur.lastPreview,
+                unread: typeof data.unread_count === "number" ? data.unread_count : cur.unread,
+              },
+            };
+          });
+          return;
+        }
+
         if (data.type === "message_deleted") {
           const deletedId = String(data.message_id);
           setMessagesByUser((prev) => {

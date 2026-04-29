@@ -136,6 +136,19 @@ export default function ChannelPage() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        // Unread reset (server-confirmed mark-as-read)
+        if (data.type === "channel_unread_reset") {
+          const cid = data.channel_id ?? data.data?.channel_id;
+          if (cid == null) return;
+          setChannels((prev) =>
+            prev.map((c) =>
+              String(c.id) === String(cid) ? { ...c, unread_count: 0 } : c,
+            ),
+          );
+          return;
+        }
+
         // Backends commonly use one of these for new posts.
         const isPost =
           data.type === "channel_post" ||
@@ -150,6 +163,39 @@ export default function ChannelPage() {
         if (!cid) return;
 
         const post = mapToChannelPost(payload, cid);
+        const isOwn = String(post.sender_id) === String(currentUserId);
+        const serverUnread =
+          typeof data.unread_count === "number"
+            ? data.unread_count
+            : typeof payload.unread_count === "number"
+              ? payload.unread_count
+              : null;
+
+        // Update channel-list meta: preview, time, unread, then re-sort.
+        setChannels((prev) => {
+          const idx = prev.findIndex((c) => String(c.id) === String(cid));
+          if (idx === -1) return prev;
+          const cur = prev[idx];
+          // Active channel is being viewed → keep unread at 0; others increment.
+          let nextUnread = cur.unread_count ?? 0;
+          if (serverUnread != null) {
+            nextUnread = serverUnread;
+          } else if (!isOwn) {
+            const isActive =
+              document.visibilityState === "visible" &&
+              String(selectedRef.current?.id) === String(cid);
+            if (!isActive) nextUnread = nextUnread + 1;
+          }
+          const updated: Channel = {
+            ...cur,
+            last_message: previewFromPost(post) || cur.last_message || null,
+            last_message_time: post.created_at,
+            unread_count: nextUnread,
+          };
+          const next = [...prev];
+          next[idx] = updated;
+          return sortChannels(next);
+        });
 
         setPostsByChannel((prev) => {
           const key = String(cid);
@@ -157,7 +203,7 @@ export default function ChannelPage() {
           // dedupe by real id
           if (!post.id.startsWith("tmp-") && list.some((p) => p.id === post.id)) return prev;
           // try to swap an optimistic tmp post from this user
-          if (String(post.sender_id) === String(currentUserId)) {
+          if (isOwn) {
             const tmpIdx = [...list].reverse().findIndex((p) => p.id.startsWith("tmp-"));
             if (tmpIdx !== -1) {
               const realIdx = list.length - 1 - tmpIdx;

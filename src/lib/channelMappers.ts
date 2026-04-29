@@ -17,6 +17,11 @@ export function mapToChannel(raw: any, currentUserId?: string | number): Channel
     is_admin:
       raw.is_admin === true ||
       (currentUserId != null && adminId != null && String(adminId) === String(currentUserId)),
+    unread_count: Number(raw.unread_count ?? raw.unread ?? 0) || 0,
+    last_message:
+      raw.last_message ?? raw.last_post ?? raw.last_message_text ?? null,
+    last_message_time:
+      raw.last_message_time ?? raw.last_post_time ?? raw.last_activity ?? raw.updated_at ?? null,
   };
 }
 

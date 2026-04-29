@@ -35,6 +35,24 @@ function initials(name: string) {
   return (name || "C").slice(0, 2).toUpperCase();
 }
 
+function previewFromPost(p: { message?: string | null; file?: { name?: string } | null }): string {
+  if (p.message) {
+    const text = p.message.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+    if (text) return text;
+  }
+  if (p.file?.name) return `📎 ${p.file.name}`;
+  return "";
+}
+
+function sortChannels(list: Channel[]): Channel[] {
+  return [...list].sort((a, b) => {
+    const ta = a.last_message_time ? new Date(a.last_message_time).getTime() : 0;
+    const tb = b.last_message_time ? new Date(b.last_message_time).getTime() : 0;
+    if (tb !== ta) return tb - ta;
+    return (a.name || "").localeCompare(b.name || "");
+  });
+}
+
 export default function ChannelPage() {
   const navigate = useNavigate();
   const session = readSession();
@@ -71,7 +89,7 @@ export default function ChannelPage() {
       const res = await fetch(`${CHANNEL_ENDPOINTS.list}?user_id=${currentUserId}`);
       const json = await res.json();
       const arr = Array.isArray(json) ? json : json.data || json.channels || [];
-      setChannels(arr.map((c: any) => mapToChannel(c, currentUserId)));
+      setChannels(sortChannels(arr.map((c: any) => mapToChannel(c, currentUserId))));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load channels");
     } finally {
@@ -118,6 +136,19 @@ export default function ChannelPage() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        // Unread reset (server-confirmed mark-as-read)
+        if (data.type === "channel_unread_reset") {
+          const cid = data.channel_id ?? data.data?.channel_id;
+          if (cid == null) return;
+          setChannels((prev) =>
+            prev.map((c) =>
+              String(c.id) === String(cid) ? { ...c, unread_count: 0 } : c,
+            ),
+          );
+          return;
+        }
+
         // Backends commonly use one of these for new posts.
         const isPost =
           data.type === "channel_post" ||
@@ -132,6 +163,39 @@ export default function ChannelPage() {
         if (!cid) return;
 
         const post = mapToChannelPost(payload, cid);
+        const isOwn = String(post.sender_id) === String(currentUserId);
+        const serverUnread =
+          typeof data.unread_count === "number"
+            ? data.unread_count
+            : typeof payload.unread_count === "number"
+              ? payload.unread_count
+              : null;
+
+        // Update channel-list meta: preview, time, unread, then re-sort.
+        setChannels((prev) => {
+          const idx = prev.findIndex((c) => String(c.id) === String(cid));
+          if (idx === -1) return prev;
+          const cur = prev[idx];
+          // Active channel is being viewed → keep unread at 0; others increment.
+          let nextUnread = cur.unread_count ?? 0;
+          if (serverUnread != null) {
+            nextUnread = serverUnread;
+          } else if (!isOwn) {
+            const isActive =
+              document.visibilityState === "visible" &&
+              String(selectedRef.current?.id) === String(cid);
+            if (!isActive) nextUnread = nextUnread + 1;
+          }
+          const updated: Channel = {
+            ...cur,
+            last_message: previewFromPost(post) || cur.last_message || null,
+            last_message_time: post.created_at,
+            unread_count: nextUnread,
+          };
+          const next = [...prev];
+          next[idx] = updated;
+          return sortChannels(next);
+        });
 
         setPostsByChannel((prev) => {
           const key = String(cid);
@@ -139,7 +203,7 @@ export default function ChannelPage() {
           // dedupe by real id
           if (!post.id.startsWith("tmp-") && list.some((p) => p.id === post.id)) return prev;
           // try to swap an optimistic tmp post from this user
-          if (String(post.sender_id) === String(currentUserId)) {
+          if (isOwn) {
             const tmpIdx = [...list].reverse().findIndex((p) => p.id.startsWith("tmp-"));
             if (tmpIdx !== -1) {
               const realIdx = list.length - 1 - tmpIdx;
@@ -167,9 +231,48 @@ export default function ChannelPage() {
   }, [selected, currentUserId]);
 
   // ---- Handlers ----
+  const markChannelRead = useCallback(
+    (channelId: string | number) => {
+      if (!currentUserId) return;
+      const ws = wsRef.current;
+      const payload = {
+        type: "channel_mark_read",
+        channel_id: channelId,
+        user_id: currentUserId,
+      };
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(JSON.stringify(payload));
+          return;
+        } catch {
+          // fall through to HTTP
+        }
+      }
+      // HTTP fallback
+      fetch(CHANNEL_ENDPOINTS.markChannelRead, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel_id: channelId, user_id: currentUserId }),
+      }).catch(() => {
+        /* best-effort */
+      });
+    },
+    [currentUserId],
+  );
+
   const handleSelect = (c: Channel) => {
     setSelected(c);
     if (!postsByChannel[String(c.id)]) loadPosts(c.id);
+    // Optimistically clear unread for the opened channel.
+    setChannels((prev) =>
+      prev.map((ch) =>
+        String(ch.id) === String(c.id) ? { ...ch, unread_count: 0 } : ch,
+      ),
+    );
+    // Tell server (WS preferred, HTTP fallback). The WS event for THIS
+    // channel may not be open yet, so defer slightly so the new socket
+    // (opened by the selected-effect) has a chance to connect.
+    setTimeout(() => markChannelRead(c.id), 200);
   };
 
   const handleCreate = async (name: string, description: string) => {

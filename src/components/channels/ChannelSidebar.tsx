@@ -32,6 +32,29 @@ function getInitials(name: string) {
   return (name || "C").slice(0, 2).toUpperCase();
 }
 
+function stripHtml(s: string): string {
+  return s.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
+function formatTime(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) {
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  const dayMs = 24 * 60 * 60 * 1000;
+  if (now.getTime() - d.getTime() < 7 * dayMs) {
+    return d.toLocaleDateString([], { weekday: "short" });
+  }
+  return d.toLocaleDateString([], { day: "2-digit", month: "2-digit" });
+}
+
 export default function ChannelSidebar({
   channels,
   selectedId,
@@ -106,6 +129,11 @@ export default function ChannelSidebar({
           <ul>
             {filtered.map((c) => {
               const active = String(c.id) === String(selectedId);
+              const unread = c.unread_count ?? 0;
+              const hasUnread = unread > 0;
+              const previewRaw = c.last_message ?? c.description ?? "";
+              const preview = stripHtml(previewRaw);
+              const time = formatTime(c.last_message_time);
               return (
                 <li key={c.id}>
                   <button
@@ -123,13 +151,37 @@ export default function ChannelSidebar({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <img src={channelIcon} alt="" className="h-3.5 w-3.5 shrink-0 object-contain" />
-                        <span className="font-medium text-sm truncate">{c.name}</span>
+                        <span
+                          className={`text-sm truncate flex-1 ${
+                            hasUnread ? "font-bold text-foreground" : "font-medium"
+                          }`}
+                        >
+                          {c.name}
+                        </span>
+                        {time && (
+                          <span
+                            className={`text-[10px] shrink-0 ${
+                              hasUnread ? "text-primary font-semibold" : "text-muted-foreground"
+                            }`}
+                          >
+                            {time}
+                          </span>
+                        )}
                       </div>
-                      {c.description && (
-                        <p className="text-xs text-muted-foreground truncate">
-                          {c.description}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p
+                          className={`text-xs truncate flex-1 ${
+                            hasUnread ? "text-foreground/80" : "text-muted-foreground"
+                          }`}
+                        >
+                          {preview || (c.description ?? "")}
                         </p>
-                      )}
+                        {hasUnread && (
+                          <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground text-[10px] font-bold shadow-sm animate-in fade-in zoom-in-50 duration-200">
+                            {unread > 99 ? "99+" : unread}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </button>
                 </li>

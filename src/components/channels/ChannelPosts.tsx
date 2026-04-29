@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Attachment from "@/components/Attachment";
+import HtmlMessage, { looksLikeHtml } from "@/components/HtmlMessage";
 import type { ChannelPost } from "@/lib/channelTypes";
 
 interface Props {
@@ -121,9 +122,13 @@ export default function ChannelPosts({ posts, loading }: Props) {
                 )}
 
                 {p.message && (
-                  <p className="text-sm whitespace-pre-wrap break-words text-foreground">
-                    {p.message}
-                  </p>
+                  looksLikeHtml(p.message) ? (
+                    <HtmlMessage html={p.message} isMe={false} />
+                  ) : (
+                    <p className="text-sm whitespace-pre-wrap break-words text-foreground">
+                      {p.message}
+                    </p>
+                  )
                 )}
               </article>
             </div>

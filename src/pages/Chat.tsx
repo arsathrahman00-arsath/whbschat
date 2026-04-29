@@ -733,41 +733,77 @@ export default function Chat() {
             </div>
           ) : (
             <div className="p-2 space-y-0.5">
-              {filteredUsers.map((user) => (
-                <button
-                  key={user.id}
-                  onClick={() => handleSelectUser(user)}
-                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all active:scale-[0.98] ${
-                    selectedUser?.id === user.id ? "bg-[#8B5CF6]/10 border border-[#8B5CF6]/20" : "hover:bg-gray-50"
-                  }`}
-                >
-                  <Avatar className="h-11 w-11">
-                    <AvatarFallback
-                      className={`bg-gradient-to-br ${getAvatarColor(user.username)} text-white text-sm font-semibold`}
-                    >
-                      {getInitials(user.username)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className={`text-sm font-medium truncate ${selectedUser?.id === user.id ? "text-[#8B5CF6]" : "text-gray-900"}`}
-                    >
-                      {user.username}
-                    </p>
-                    {(() => {
-                      const s = formatStatusDisplay(userStatuses[String(user.id)]);
-                      return s.text ? (
+              {filteredUsers.map((user) => {
+                const meta = chatMetaByUser[String(user.id)];
+                const hasActivity = !!(meta && (meta.lastActivity || meta.lastPreview));
+                const unread = meta?.unread || 0;
+                const isSelected = selectedUser?.id === user.id;
+                const status = formatStatusDisplay(userStatuses[String(user.id)]);
+                return (
+                  <button
+                    key={user.id}
+                    onClick={() => handleSelectUser(user)}
+                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all active:scale-[0.98] ${
+                      isSelected ? "bg-[#8B5CF6]/10 border border-[#8B5CF6]/20" : "hover:bg-gray-50"
+                    }`}
+                  >
+                    <Avatar className="h-11 w-11">
+                      <AvatarFallback
+                        className={`bg-gradient-to-br ${getAvatarColor(user.username)} text-white text-sm font-semibold`}
+                      >
+                        {getInitials(user.username)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
                         <p
-                          className={`text-xs flex items-center gap-1 ${s.isActive ? "text-green-500" : "text-muted-foreground"}`}
+                          className={`text-sm font-medium truncate ${isSelected ? "text-[#8B5CF6]" : "text-gray-900"}`}
                         >
-                          {s.isActive && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />}
-                          {s.text}
+                          {user.username}
                         </p>
-                      ) : null;
-                    })()}
-                  </div>
-                </button>
-              ))}
+                        {hasActivity && meta?.lastActivity ? (
+                          <span
+                            className={`text-[11px] flex-shrink-0 ${
+                              unread > 0 ? "text-[#22C55E] font-semibold" : "text-gray-400"
+                            }`}
+                          >
+                            {formatChatTime(meta.lastActivity)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                        {hasActivity && meta?.lastPreview ? (
+                          <p
+                            className={`text-xs truncate ${
+                              unread > 0 ? "text-gray-700 font-medium" : "text-muted-foreground"
+                            }`}
+                          >
+                            {meta.lastPreview}
+                          </p>
+                        ) : status.text ? (
+                          <p
+                            className={`text-xs flex items-center gap-1 truncate ${
+                              status.isActive ? "text-green-500" : "text-muted-foreground"
+                            }`}
+                          >
+                            {status.isActive && (
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
+                            )}
+                            {status.text}
+                          </p>
+                        ) : (
+                          <span />
+                        )}
+                        {unread > 0 && (
+                          <span className="ml-auto flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-gradient-to-r from-[#1E90FF] to-[#22C55E] text-white text-[11px] font-semibold flex items-center justify-center">
+                            {unread > 99 ? "99+" : unread}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </ScrollArea>

@@ -13,6 +13,7 @@ export const CHANNEL_ENDPOINTS = {
   joinChannel: `${HTTP_BASE}/chat/join_channel/`,
   members: `${HTTP_BASE}/chat/get_channel_members/`,
   users: `${HTTP_BASE}/chat/get_users/`,
+  approveCleanData: `${HTTP_BASE}/chat/approve_clean_data/`,
 };
 
 export function channelWsUrl(channelId: string | number): string {

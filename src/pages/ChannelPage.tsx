@@ -231,9 +231,48 @@ export default function ChannelPage() {
   }, [selected, currentUserId]);
 
   // ---- Handlers ----
+  const markChannelRead = useCallback(
+    (channelId: string | number) => {
+      if (!currentUserId) return;
+      const ws = wsRef.current;
+      const payload = {
+        type: "channel_mark_read",
+        channel_id: channelId,
+        user_id: currentUserId,
+      };
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(JSON.stringify(payload));
+          return;
+        } catch {
+          // fall through to HTTP
+        }
+      }
+      // HTTP fallback
+      fetch(CHANNEL_ENDPOINTS.markChannelRead, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel_id: channelId, user_id: currentUserId }),
+      }).catch(() => {
+        /* best-effort */
+      });
+    },
+    [currentUserId],
+  );
+
   const handleSelect = (c: Channel) => {
     setSelected(c);
     if (!postsByChannel[String(c.id)]) loadPosts(c.id);
+    // Optimistically clear unread for the opened channel.
+    setChannels((prev) =>
+      prev.map((ch) =>
+        String(ch.id) === String(c.id) ? { ...ch, unread_count: 0 } : ch,
+      ),
+    );
+    // Tell server (WS preferred, HTTP fallback). The WS event for THIS
+    // channel may not be open yet, so defer slightly so the new socket
+    // (opened by the selected-effect) has a chance to connect.
+    setTimeout(() => markChannelRead(c.id), 200);
   };
 
   const handleCreate = async (name: string, description: string) => {

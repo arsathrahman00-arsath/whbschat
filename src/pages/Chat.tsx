@@ -25,6 +25,37 @@ interface ChatUser {
   user_code?: number;
 }
 
+interface ChatMeta {
+  lastActivity: number; // ms epoch — used purely for sidebar sort
+  lastPreview: string; // text preview of last message ("📎 file.png" for files)
+  unread: number;
+}
+
+function previewFromMessage(text: string | null | undefined, fileName?: string | null): string {
+  const t = (text || "").trim();
+  if (t) {
+    // Strip HTML tags for sidebar preview only
+    const stripped = t.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    return stripped || (fileName ? `📎 ${fileName}` : "");
+  }
+  if (fileName) return `📎 ${fileName}`;
+  return "";
+}
+
+function formatChatTime(ms: number): string {
+  if (!ms) return "";
+  const d = new Date(ms);
+  if (isNaN(d.getTime())) return "";
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = today.getTime() - day.getTime();
+  if (diff === 0) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+  if (diff === 86400000) return "Yesterday";
+  if (diff < 7 * 86400000) return d.toLocaleDateString([], { weekday: "short" });
+  return d.toLocaleDateString([], { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+
 interface UserStatusInfo {
   status: "Active" | "Offline";
   last_seen: string | null;
@@ -121,6 +152,36 @@ export default function Chat() {
 
   const currentUserId = session?.userId || session?.id;
 
+  const [chatMetaByUser, setChatMetaByUser] = useState<Record<string, ChatMeta>>({});
+
+  const bumpMeta = useCallback(
+    (peerId: string | number, opts: { preview?: string; ts?: number; incrementUnread?: boolean }) => {
+      const key = String(peerId);
+      const ts = opts.ts ?? Date.now();
+      setChatMetaByUser((prev) => {
+        const cur = prev[key] || { lastActivity: 0, lastPreview: "", unread: 0 };
+        return {
+          ...prev,
+          [key]: {
+            lastActivity: Math.max(cur.lastActivity, ts),
+            lastPreview: opts.preview ?? cur.lastPreview,
+            unread: opts.incrementUnread ? cur.unread + 1 : cur.unread,
+          },
+        };
+      });
+    },
+    [],
+  );
+
+  const clearUnread = useCallback((peerId: string | number) => {
+    const key = String(peerId);
+    setChatMetaByUser((prev) => {
+      const cur = prev[key];
+      if (!cur || cur.unread === 0) return prev;
+      return { ...prev, [key]: { ...cur, unread: 0 } };
+    });
+  }, []);
+
   useEffect(() => {
     messagesByUserRef.current = messagesByUser;
   }, [messagesByUser]);
@@ -195,6 +256,25 @@ export default function Chat() {
           return;
         }
 
+        // Backend-ready hook: server may push authoritative unread/preview updates.
+        if (data.type === "unread_update" && data.user_id != null) {
+          const peerKey = String(data.user_id);
+          setChatMetaByUser((prev) => {
+            const cur = prev[peerKey] || { lastActivity: 0, lastPreview: "", unread: 0 };
+            return {
+              ...prev,
+              [peerKey]: {
+                lastActivity: data.last_message_time
+                  ? new Date(data.last_message_time).getTime() || cur.lastActivity
+                  : cur.lastActivity,
+                lastPreview: typeof data.last_message === "string" ? data.last_message : cur.lastPreview,
+                unread: typeof data.unread_count === "number" ? data.unread_count : cur.unread,
+              },
+            };
+          });
+          return;
+        }
+
         if (data.type === "message_deleted") {
           const deletedId = String(data.message_id);
           setMessagesByUser((prev) => {
@@ -232,28 +312,20 @@ export default function Chat() {
         const incoming = mapToChatMessage(data, currentUserId);
         console.log("[WS] chat_message", { isFromMe, peerKey, incoming });
 
+        const previewText = previewFromMessage(incoming.message, incoming.file?.name);
+        const ts = new Date(incoming.created_at).getTime() || Date.now();
+
         if (isFromMe) {
           setMessagesByUser((prev) => {
             const list = prev[peerKey] || [];
-            // if exact server id already exists, do nothing
             if (list.some((m) => m.id === incoming.id)) return prev;
-            // replace latest tmp message if possible
             const tmpIdx = [...list].reverse().findIndex((m) => m.id.startsWith("tmp-"));
             if (tmpIdx !== -1) {
               const realIdx = list.length - 1 - tmpIdx;
               const next = [...list];
-              // next[realIdx] = {
-              //   ...next[realIdx],
-              //   ...incoming,
-              //   file: incoming.file ?? next[realIdx].file ?? null,
-              //   reply_to: incoming.reply_to ?? next[realIdx].reply_to ?? null,
-              //   uploading: false,
-              //   upload_error: null,
-              // };
               next[realIdx] = {
                 ...next[realIdx],
                 ...incoming,
-                // keep optimistic created_at so ordering does not jump during live update
                 created_at: next[realIdx].created_at || incoming.created_at,
                 file: incoming.file ?? next[realIdx].file ?? null,
                 reply_to: incoming.reply_to ?? next[realIdx].reply_to ?? null,
@@ -264,6 +336,8 @@ export default function Chat() {
             }
             return { ...prev, [peerKey]: [...list, incoming] };
           });
+          // Sender side: update preview/activity, never bump unread
+          if (peerKey) bumpMeta(peerKey, { preview: previewText, ts });
           return;
         }
 
@@ -281,6 +355,15 @@ export default function Chat() {
         }
 
         appendMessage(peerKey, incoming);
+
+        // Only increment unread when the chat is not actively focused
+        const activePeerId = selectedUserRef.current ? String(selectedUserRef.current.id) : null;
+        const isViewingThisChat = activePeerId === peerKey && !document.hidden;
+        bumpMeta(peerKey, {
+          preview: previewText,
+          ts,
+          incrementUnread: !isViewingThisChat,
+        });
       } catch (err) {
         console.error("Failed to parse WebSocket message:", err);
       }
@@ -293,7 +376,7 @@ export default function Chat() {
     };
 
     ws.onerror = (err) => console.error("WebSocket error:", err);
-  }, [currentUserId, appendMessage]);
+  }, [currentUserId, appendMessage, bumpMeta]);
 
   useEffect(() => {
     if (!session) {
@@ -316,8 +399,19 @@ export default function Chat() {
     setSelectedUser(user);
     setSidebarOpen(false);
     setChatId(generateChatId(currentUserId, user.id));
+    // Reset unread immediately on open
+    clearUnread(user.id);
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "get_status", target_user_id: user.id }));
+      // Backend-ready hook: tell server this chat has been read.
+      wsRef.current.send(
+        JSON.stringify({
+          type: "mark_as_read",
+          chat_id: generateChatId(currentUserId, user.id),
+          user_id: currentUserId,
+          peer_id: user.id,
+        }),
+      );
     }
   };
 
@@ -336,6 +430,29 @@ export default function Chat() {
       if (session?.username)
         userList = userList.filter((u) => u.username.toLowerCase() !== session.username.toLowerCase());
       setUsers(userList);
+
+      // Backend-ready: seed unread/preview/last_message_time if API provides them.
+      const seeded: Record<string, ChatMeta> = {};
+      for (const u of rawList) {
+        const key = String(u.id);
+        if (!key) continue;
+        const ts = u.last_message_time
+          ? new Date(u.last_message_time).getTime() || 0
+          : u.last_message_at
+            ? new Date(u.last_message_at).getTime() || 0
+            : 0;
+        const preview =
+          (typeof u.last_message === "string" && u.last_message) ||
+          (typeof u.last_message_text === "string" && u.last_message_text) ||
+          "";
+        const unread = Number(u.unread_count ?? u.unread ?? 0) || 0;
+        if (ts || preview || unread) {
+          seeded[key] = { lastActivity: ts, lastPreview: preview, unread };
+        }
+      }
+      if (Object.keys(seeded).length) {
+        setChatMetaByUser((prev) => ({ ...seeded, ...prev }));
+      }
     } catch (err) {
       console.error("Failed to fetch users:", err);
     } finally {
@@ -394,6 +511,10 @@ export default function Chat() {
     };
 
     appendMessage(peerKey, optimistic);
+    bumpMeta(peerKey, {
+      preview: previewFromMessage(text || null, file?.name),
+      ts: Date.now(),
+    });
 
     // Reset input UI
     setInput("");
@@ -534,7 +655,15 @@ export default function Chat() {
     navigate("/login");
   };
 
-  const filteredUsers = users.filter((u) => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredUsers = users
+    .filter((u) => u.username.toLowerCase().includes(searchQuery.toLowerCase()))
+    .slice()
+    .sort((a, b) => {
+      const ma = chatMetaByUser[String(a.id)]?.lastActivity || 0;
+      const mb = chatMetaByUser[String(b.id)]?.lastActivity || 0;
+      if (ma !== mb) return mb - ma;
+      return a.username.localeCompare(b.username);
+    });
   const selectedUserStatusInfo = selectedUser
     ? userStatuses[String(selectedUser.id)] || { status: "Offline" as const, last_seen: null }
     : undefined;
@@ -604,41 +733,77 @@ export default function Chat() {
             </div>
           ) : (
             <div className="p-2 space-y-0.5">
-              {filteredUsers.map((user) => (
-                <button
-                  key={user.id}
-                  onClick={() => handleSelectUser(user)}
-                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all active:scale-[0.98] ${
-                    selectedUser?.id === user.id ? "bg-[#8B5CF6]/10 border border-[#8B5CF6]/20" : "hover:bg-gray-50"
-                  }`}
-                >
-                  <Avatar className="h-11 w-11">
-                    <AvatarFallback
-                      className={`bg-gradient-to-br ${getAvatarColor(user.username)} text-white text-sm font-semibold`}
-                    >
-                      {getInitials(user.username)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className={`text-sm font-medium truncate ${selectedUser?.id === user.id ? "text-[#8B5CF6]" : "text-gray-900"}`}
-                    >
-                      {user.username}
-                    </p>
-                    {(() => {
-                      const s = formatStatusDisplay(userStatuses[String(user.id)]);
-                      return s.text ? (
+              {filteredUsers.map((user) => {
+                const meta = chatMetaByUser[String(user.id)];
+                const hasActivity = !!(meta && (meta.lastActivity || meta.lastPreview));
+                const unread = meta?.unread || 0;
+                const isSelected = selectedUser?.id === user.id;
+                const status = formatStatusDisplay(userStatuses[String(user.id)]);
+                return (
+                  <button
+                    key={user.id}
+                    onClick={() => handleSelectUser(user)}
+                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all active:scale-[0.98] ${
+                      isSelected ? "bg-[#8B5CF6]/10 border border-[#8B5CF6]/20" : "hover:bg-gray-50"
+                    }`}
+                  >
+                    <Avatar className="h-11 w-11">
+                      <AvatarFallback
+                        className={`bg-gradient-to-br ${getAvatarColor(user.username)} text-white text-sm font-semibold`}
+                      >
+                        {getInitials(user.username)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
                         <p
-                          className={`text-xs flex items-center gap-1 ${s.isActive ? "text-green-500" : "text-muted-foreground"}`}
+                          className={`text-sm font-medium truncate ${isSelected ? "text-[#8B5CF6]" : "text-gray-900"}`}
                         >
-                          {s.isActive && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />}
-                          {s.text}
+                          {user.username}
                         </p>
-                      ) : null;
-                    })()}
-                  </div>
-                </button>
-              ))}
+                        {hasActivity && meta?.lastActivity ? (
+                          <span
+                            className={`text-[11px] flex-shrink-0 ${
+                              unread > 0 ? "text-[#22C55E] font-semibold" : "text-gray-400"
+                            }`}
+                          >
+                            {formatChatTime(meta.lastActivity)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                        {hasActivity && meta?.lastPreview ? (
+                          <p
+                            className={`text-xs truncate ${
+                              unread > 0 ? "text-gray-700 font-medium" : "text-muted-foreground"
+                            }`}
+                          >
+                            {meta.lastPreview}
+                          </p>
+                        ) : status.text ? (
+                          <p
+                            className={`text-xs flex items-center gap-1 truncate ${
+                              status.isActive ? "text-green-500" : "text-muted-foreground"
+                            }`}
+                          >
+                            {status.isActive && (
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
+                            )}
+                            {status.text}
+                          </p>
+                        ) : (
+                          <span />
+                        )}
+                        {unread > 0 && (
+                          <span className="ml-auto flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-gradient-to-r from-[#1E90FF] to-[#22C55E] text-white text-[11px] font-semibold flex items-center justify-center">
+                            {unread > 99 ? "99+" : unread}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </ScrollArea>

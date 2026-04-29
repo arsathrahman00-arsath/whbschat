@@ -12,6 +12,10 @@ export interface Channel {
   created_at?: string;
   members_count?: number;
   is_admin?: boolean;
+  // Telegram-style chat-list metadata
+  unread_count?: number;
+  last_message?: string | null;
+  last_message_time?: string | null;
 }
 
 export interface ChannelPost {

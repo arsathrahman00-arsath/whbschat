@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Attachment from "@/components/Attachment";
+import HtmlMessage, { looksLikeHtml } from "@/components/HtmlMessage";
 import type { ChannelPost } from "@/lib/channelTypes";
 
 interface Props {

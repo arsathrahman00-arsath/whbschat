@@ -511,6 +511,10 @@ export default function Chat() {
     };
 
     appendMessage(peerKey, optimistic);
+    bumpMeta(peerKey, {
+      preview: previewFromMessage(text || null, file?.name),
+      ts: Date.now(),
+    });
 
     // Reset input UI
     setInput("");

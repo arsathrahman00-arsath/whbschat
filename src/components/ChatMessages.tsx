@@ -4,6 +4,7 @@ import { MessageCircle } from "lucide-react";
 import MessageContextMenu from "@/components/MessageContextMenu";
 import Attachment from "@/components/Attachment";
 import { mapToChatMessage, type ChatMessage } from "@/lib/chatMessage";
+import HtmlMessage, { looksLikeHtml } from "@/components/HtmlMessage";
 import { toast } from "sonner";
 
 interface ChatMessagesProps {

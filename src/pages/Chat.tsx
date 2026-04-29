@@ -655,7 +655,15 @@ export default function Chat() {
     navigate("/login");
   };
 
-  const filteredUsers = users.filter((u) => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredUsers = users
+    .filter((u) => u.username.toLowerCase().includes(searchQuery.toLowerCase()))
+    .slice()
+    .sort((a, b) => {
+      const ma = chatMetaByUser[String(a.id)]?.lastActivity || 0;
+      const mb = chatMetaByUser[String(b.id)]?.lastActivity || 0;
+      if (ma !== mb) return mb - ma;
+      return a.username.localeCompare(b.username);
+    });
   const selectedUserStatusInfo = selectedUser
     ? userStatuses[String(selectedUser.id)] || { status: "Offline" as const, last_seen: null }
     : undefined;

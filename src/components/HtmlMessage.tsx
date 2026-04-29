@@ -43,6 +43,13 @@ export default function HtmlMessage({ html, isMe, onAction }: Props) {
       const action = actionEl.getAttribute("data-action") || "";
       if (action === "approve") console.log("Approved clicked");
       else if (action === "reject") console.log("Rejected clicked");
+      // Broadcast so page-level handlers (e.g. ChannelPage) can react
+      // without prop-drilling through every message component.
+      window.dispatchEvent(
+        new CustomEvent("html-message-action", {
+          detail: { action, element: actionEl },
+        }),
+      );
       onAction?.(action, actionEl);
     };
     node.addEventListener("click", handler);

@@ -311,6 +311,25 @@ export default function ChannelPage() {
     }
   };
 
+  // Listen for approve/reject clicks on backend HTML messages
+  // (dispatched by HtmlMessage). Keep handler ref fresh.
+  const handleApproveRef = useRef(handleApprove);
+  useEffect(() => {
+    handleApproveRef.current = handleApprove;
+  });
+  useEffect(() => {
+    const onAction = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { action?: string } | undefined;
+      if (detail?.action === "approve") {
+        handleApproveRef.current();
+      } else if (detail?.action === "reject") {
+        toast.message("Reject action received");
+      }
+    };
+    window.addEventListener("html-message-action", onAction);
+    return () => window.removeEventListener("html-message-action", onAction);
+  }, []);
+
   const posts = selected ? postsByChannel[String(selected.id)] || [] : [];
 
   return (

@@ -59,3 +59,69 @@
     font-family: 'Inter', sans-serif;
   }
 }
+
+/* Scoped styles for HTML messages rendered from backend */
+.html-message {
+  font-size: 14px;
+  line-height: 1.4;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.html-message > *:first-child { margin-top: 0; }
+.html-message > *:last-child { margin-bottom: 0; }
+.html-message p { margin: 0 0 6px; }
+.html-message a { text-decoration: underline; }
+.html-message ul, .html-message ol { padding-left: 1.25rem; margin: 4px 0; }
+.html-message table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 6px 0;
+  font-size: 13px;
+}
+.html-message th, .html-message td {
+  border: 1px solid hsl(var(--border));
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.html-message--me th, .html-message--me td { border-color: hsl(0 0% 100% / 0.3); }
+.html-message th { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
+.html-message--me th { background: hsl(0 0% 100% / 0.15); color: inherit; }
+
+.html-message button,
+.html-message [data-action] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  margin: 4px 4px 0 0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  transition: opacity 0.15s ease;
+}
+.html-message [data-action="approve"] {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+  border-color: transparent;
+}
+.html-message [data-action="reject"] {
+  background: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+  border-color: transparent;
+}
+.html-message [data-action]:hover { opacity: 0.9; }
+.html-message img { max-width: 100%; height: auto; border-radius: 6px; }
+.html-message pre {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  padding: 8px;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 12px;
+}
+.html-message code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }

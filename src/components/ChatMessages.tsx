@@ -4,6 +4,7 @@ import { MessageCircle } from "lucide-react";
 import MessageContextMenu from "@/components/MessageContextMenu";
 import Attachment from "@/components/Attachment";
 import { mapToChatMessage, type ChatMessage } from "@/lib/chatMessage";
+import HtmlMessage, { looksLikeHtml } from "@/components/HtmlMessage";
 import { toast } from "sonner";
 
 interface ChatMessagesProps {
@@ -249,9 +250,15 @@ export default function ChatMessages({
           )}
 
           {(!hasFile || hasCaption) && !m.deleted && hasText && (
-            <span className={`break-words whitespace-pre-wrap ${hasFile ? "block px-[9px] py-[6px]" : ""}`}>
-              {text}
-            </span>
+            looksLikeHtml(text) ? (
+              <div className={hasFile ? "block px-[9px] py-[6px]" : ""}>
+                <HtmlMessage html={text} isMe={isMe} />
+              </div>
+            ) : (
+              <span className={`break-words whitespace-pre-wrap ${hasFile ? "block px-[9px] py-[6px]" : ""}`}>
+                {text}
+              </span>
+            )
           )}
           {m.deleted && <span className="break-words whitespace-pre-wrap">{text}</span>}
 

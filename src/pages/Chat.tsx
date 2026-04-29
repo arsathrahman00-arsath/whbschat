@@ -25,6 +25,37 @@ interface ChatUser {
   user_code?: number;
 }
 
+interface ChatMeta {
+  lastActivity: number; // ms epoch — used purely for sidebar sort
+  lastPreview: string; // text preview of last message ("📎 file.png" for files)
+  unread: number;
+}
+
+function previewFromMessage(text: string | null | undefined, fileName?: string | null): string {
+  const t = (text || "").trim();
+  if (t) {
+    // Strip HTML tags for sidebar preview only
+    const stripped = t.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    return stripped || (fileName ? `📎 ${fileName}` : "");
+  }
+  if (fileName) return `📎 ${fileName}`;
+  return "";
+}
+
+function formatChatTime(ms: number): string {
+  if (!ms) return "";
+  const d = new Date(ms);
+  if (isNaN(d.getTime())) return "";
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = today.getTime() - day.getTime();
+  if (diff === 0) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+  if (diff === 86400000) return "Yesterday";
+  if (diff < 7 * 86400000) return d.toLocaleDateString([], { weekday: "short" });
+  return d.toLocaleDateString([], { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+
 interface UserStatusInfo {
   status: "Active" | "Offline";
   last_seen: string | null;

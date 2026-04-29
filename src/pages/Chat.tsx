@@ -399,8 +399,19 @@ export default function Chat() {
     setSelectedUser(user);
     setSidebarOpen(false);
     setChatId(generateChatId(currentUserId, user.id));
+    // Reset unread immediately on open
+    clearUnread(user.id);
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "get_status", target_user_id: user.id }));
+      // Backend-ready hook: tell server this chat has been read.
+      wsRef.current.send(
+        JSON.stringify({
+          type: "mark_as_read",
+          chat_id: generateChatId(currentUserId, user.id),
+          user_id: currentUserId,
+          peer_id: user.id,
+        }),
+      );
     }
   };
 

@@ -152,6 +152,36 @@ export default function Chat() {
 
   const currentUserId = session?.userId || session?.id;
 
+  const [chatMetaByUser, setChatMetaByUser] = useState<Record<string, ChatMeta>>({});
+
+  const bumpMeta = useCallback(
+    (peerId: string | number, opts: { preview?: string; ts?: number; incrementUnread?: boolean }) => {
+      const key = String(peerId);
+      const ts = opts.ts ?? Date.now();
+      setChatMetaByUser((prev) => {
+        const cur = prev[key] || { lastActivity: 0, lastPreview: "", unread: 0 };
+        return {
+          ...prev,
+          [key]: {
+            lastActivity: Math.max(cur.lastActivity, ts),
+            lastPreview: opts.preview ?? cur.lastPreview,
+            unread: opts.incrementUnread ? cur.unread + 1 : cur.unread,
+          },
+        };
+      });
+    },
+    [],
+  );
+
+  const clearUnread = useCallback((peerId: string | number) => {
+    const key = String(peerId);
+    setChatMetaByUser((prev) => {
+      const cur = prev[key];
+      if (!cur || cur.unread === 0) return prev;
+      return { ...prev, [key]: { ...cur, unread: 0 } };
+    });
+  }, []);
+
   useEffect(() => {
     messagesByUserRef.current = messagesByUser;
   }, [messagesByUser]);

@@ -89,7 +89,7 @@ export default function ChannelPage() {
       const res = await fetch(`${CHANNEL_ENDPOINTS.list}?user_id=${currentUserId}`);
       const json = await res.json();
       const arr = Array.isArray(json) ? json : json.data || json.channels || [];
-      setChannels(arr.map((c: any) => mapToChannel(c, currentUserId)));
+      setChannels(sortChannels(arr.map((c: any) => mapToChannel(c, currentUserId))));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load channels");
     } finally {

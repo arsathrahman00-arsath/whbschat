@@ -293,28 +293,20 @@ export default function Chat() {
         const incoming = mapToChatMessage(data, currentUserId);
         console.log("[WS] chat_message", { isFromMe, peerKey, incoming });
 
+        const previewText = previewFromMessage(incoming.message, incoming.file?.name);
+        const ts = new Date(incoming.created_at).getTime() || Date.now();
+
         if (isFromMe) {
           setMessagesByUser((prev) => {
             const list = prev[peerKey] || [];
-            // if exact server id already exists, do nothing
             if (list.some((m) => m.id === incoming.id)) return prev;
-            // replace latest tmp message if possible
             const tmpIdx = [...list].reverse().findIndex((m) => m.id.startsWith("tmp-"));
             if (tmpIdx !== -1) {
               const realIdx = list.length - 1 - tmpIdx;
               const next = [...list];
-              // next[realIdx] = {
-              //   ...next[realIdx],
-              //   ...incoming,
-              //   file: incoming.file ?? next[realIdx].file ?? null,
-              //   reply_to: incoming.reply_to ?? next[realIdx].reply_to ?? null,
-              //   uploading: false,
-              //   upload_error: null,
-              // };
               next[realIdx] = {
                 ...next[realIdx],
                 ...incoming,
-                // keep optimistic created_at so ordering does not jump during live update
                 created_at: next[realIdx].created_at || incoming.created_at,
                 file: incoming.file ?? next[realIdx].file ?? null,
                 reply_to: incoming.reply_to ?? next[realIdx].reply_to ?? null,
@@ -325,6 +317,8 @@ export default function Chat() {
             }
             return { ...prev, [peerKey]: [...list, incoming] };
           });
+          // Sender side: update preview/activity, never bump unread
+          if (peerKey) bumpMeta(peerKey, { preview: previewText, ts });
           return;
         }
 
@@ -342,6 +336,15 @@ export default function Chat() {
         }
 
         appendMessage(peerKey, incoming);
+
+        // Only increment unread when the chat is not actively focused
+        const activePeerId = selectedUserRef.current ? String(selectedUserRef.current.id) : null;
+        const isViewingThisChat = activePeerId === peerKey && !document.hidden;
+        bumpMeta(peerKey, {
+          preview: previewText,
+          ts,
+          incrementUnread: !isViewingThisChat,
+        });
       } catch (err) {
         console.error("Failed to parse WebSocket message:", err);
       }

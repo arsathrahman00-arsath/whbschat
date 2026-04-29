@@ -32,6 +32,29 @@ function getInitials(name: string) {
   return (name || "C").slice(0, 2).toUpperCase();
 }
 
+function stripHtml(s: string): string {
+  return s.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
+function formatTime(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) {
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  const dayMs = 24 * 60 * 60 * 1000;
+  if (now.getTime() - d.getTime() < 7 * dayMs) {
+    return d.toLocaleDateString([], { weekday: "short" });
+  }
+  return d.toLocaleDateString([], { day: "2-digit", month: "2-digit" });
+}
+
 export default function ChannelSidebar({
   channels,
   selectedId,

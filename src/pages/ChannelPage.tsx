@@ -35,6 +35,24 @@ function initials(name: string) {
   return (name || "C").slice(0, 2).toUpperCase();
 }
 
+function previewFromPost(p: { message?: string | null; file?: { name?: string } | null }): string {
+  if (p.message) {
+    const text = p.message.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+    if (text) return text;
+  }
+  if (p.file?.name) return `📎 ${p.file.name}`;
+  return "";
+}
+
+function sortChannels(list: Channel[]): Channel[] {
+  return [...list].sort((a, b) => {
+    const ta = a.last_message_time ? new Date(a.last_message_time).getTime() : 0;
+    const tb = b.last_message_time ? new Date(b.last_message_time).getTime() : 0;
+    if (tb !== ta) return tb - ta;
+    return (a.name || "").localeCompare(b.name || "");
+  });
+}
+
 export default function ChannelPage() {
   const navigate = useNavigate();
   const session = readSession();

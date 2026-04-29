@@ -262,6 +262,55 @@ export default function ChannelPage() {
     }
   };
 
+  const handleApprove = async () => {
+    if (!selected || approving) return;
+    setApproving(true);
+    try {
+      // Re-fetch channels to get the latest authoritative channel_id, per spec.
+      const listRes = await fetch(`${CHANNEL_ENDPOINTS.list}?user_id=${currentUserId}`);
+      const listJson = await listRes.json();
+      const arr = Array.isArray(listJson) ? listJson : listJson.data || listJson.channels || [];
+      const match = arr.find((c: any) => String(c.id) === String(selected.id));
+      const channel_id = match?.id ?? selected.id;
+
+      const res = await fetch(CHANNEL_ENDPOINTS.approveCleanData, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel_id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.status === "error") {
+        throw new Error(json?.message || json?.error || `Approve failed (${res.status})`);
+      }
+
+      const count =
+        json?.approved ?? json?.count ?? json?.data?.approved ?? json?.data?.count;
+      const successMsg =
+        json?.message ||
+        (typeof count === "number" ? `Approved ${count} records` : "Approved successfully");
+      toast.success(successMsg);
+
+      // Append a local system message so users see immediate feedback.
+      const sysPost: ChannelPost = {
+        id: `sys-${Date.now()}`,
+        channel_id: selected.id,
+        sender_id: "system",
+        sender_name: "System",
+        message: `✅ ${successMsg}`,
+        file: null,
+        created_at: new Date().toISOString(),
+      };
+      setPostsByChannel((prev) => {
+        const key = String(selected.id);
+        return { ...prev, [key]: [...(prev[key] || []), sysPost] };
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to approve");
+    } finally {
+      setApproving(false);
+    }
+  };
+
   const posts = selected ? postsByChannel[String(selected.id)] || [] : [];
 
   return (

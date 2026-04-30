@@ -68,6 +68,7 @@ export default function ChannelPage() {
   const [membersOpen, setMembersOpen] = useState(false);
   const [joining, setJoining] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const selectedRef = useRef<Channel | null>(null);
@@ -535,11 +536,60 @@ export default function ChannelPage() {
     }
   };
 
+  const handleReject = async () => {
+    if (!selected || rejecting) return;
+    setRejecting(true);
+    try {
+      const listRes = await fetch(`${CHANNEL_ENDPOINTS.list}?user_id=${currentUserId}`);
+      const listJson = await listRes.json();
+      const arr = Array.isArray(listJson) ? listJson : listJson.data || listJson.channels || [];
+      const match = arr.find((c: any) => String(c.id) === String(selected.id));
+      const channel_id = match?.id ?? selected.id;
+
+      const res = await fetch(CHANNEL_ENDPOINTS.rejectCleanData, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel_id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.status === "error") {
+        throw new Error(json?.message || json?.error || `Reject failed (${res.status})`);
+      }
+
+      const count =
+        json?.rejected ?? json?.count ?? json?.data?.rejected ?? json?.data?.count;
+      const successMsg =
+        json?.message ||
+        (typeof count === "number" ? `Rejected ${count} records` : "Rejected successfully");
+      toast.success(successMsg);
+
+      const sysPost: ChannelPost = {
+        id: `sys-${Date.now()}`,
+        channel_id: selected.id,
+        sender_id: "system",
+        sender_name: "System",
+        message: `❌ ${successMsg}`,
+        file: null,
+        created_at: new Date().toISOString(),
+      };
+      setPostsByChannel((prev) => {
+        const key = String(selected.id);
+        return { ...prev, [key]: [...(prev[key] || []), sysPost] };
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reject");
+    } finally {
+      setRejecting(false);
+    }
+  };
+
   // Listen for approve/reject clicks on backend HTML messages
-  // (dispatched by HtmlMessage). Keep handler ref fresh.
+  // (dispatched by HtmlMessage). Keep handler refs fresh.
   const handleApproveRef = useRef(handleApprove);
+  const handleRejectRef = useRef(handleReject);
   useEffect(() => {
     handleApproveRef.current = handleApprove;
+    handleRejectRef.current = handleReject;
   });
   useEffect(() => {
     const onAction = (e: Event) => {
@@ -547,7 +597,7 @@ export default function ChannelPage() {
       if (detail?.action === "approve") {
         handleApproveRef.current();
       } else if (detail?.action === "reject") {
-        toast.message("Reject action received");
+        handleRejectRef.current();
       }
     };
     window.addEventListener("html-message-action", onAction);

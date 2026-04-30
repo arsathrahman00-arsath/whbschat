@@ -515,20 +515,6 @@ export default function ChannelPage() {
         (typeof count === "number" ? `Approved ${count} records` : "Approved successfully");
       toast.success(successMsg);
 
-      // Append a local system message so users see immediate feedback.
-      const sysPost: ChannelPost = {
-        id: `sys-${Date.now()}`,
-        channel_id: selected.id,
-        sender_id: "system",
-        sender_name: "System",
-        message: `✅ ${successMsg}`,
-        file: null,
-        created_at: new Date().toISOString(),
-      };
-      setPostsByChannel((prev) => {
-        const key = String(selected.id);
-        return { ...prev, [key]: [...(prev[key] || []), sysPost] };
-      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to approve");
     } finally {

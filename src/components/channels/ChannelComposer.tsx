@@ -3,9 +3,12 @@
 //   - file upload via paperclip (image/video/document)
 //   - small preview before send
 // File is uploaded first, then file_id is sent over the channel WebSocket.
+//
+// Non-admins see a disabled, read-only state with a "View only" hint and
+// the message: "Only admin can post in this channel".
 
 import { useRef, useState } from "react";
-import { Send, Paperclip, X, Loader2, FileText, Film } from "lucide-react";
+import { Send, Paperclip, X, Loader2, FileText, Film, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { kindFromMime, formatFileSize, type ChatAttachment } from "@/lib/chatMessage";
@@ -25,10 +28,36 @@ export default function ChannelComposer({ canPost, currentUserId, onSend }: Prop
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  // Non-admin: read-only composer with clear messaging.
   if (!canPost) {
     return (
-      <div className="border-t bg-card px-4 py-3 text-center text-sm text-muted-foreground">
-        Only the channel admin can post here.
+      <div className="border-t bg-card">
+        <div className="flex items-center justify-center gap-2 px-4 py-2 text-xs text-muted-foreground bg-muted/40">
+          <Lock className="h-3.5 w-3.5" />
+          <span>Only admin can post in this channel</span>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            disabled
+            aria-label="Attachments disabled"
+          >
+            <Paperclip className="h-5 w-5" />
+          </Button>
+          <Input
+            value=""
+            readOnly
+            disabled
+            placeholder="View only — only admin can post"
+            className="flex-1 cursor-not-allowed"
+            onClick={() => toast.error("Only admin can post in this channel")}
+          />
+          <span className="text-xs font-medium text-muted-foreground px-2 select-none">
+            View only
+          </span>
+        </div>
       </div>
     );
   }

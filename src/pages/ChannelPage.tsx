@@ -549,19 +549,6 @@ export default function ChannelPage() {
         (typeof count === "number" ? `Rejected ${count} records` : "Rejected successfully");
       toast.success(successMsg);
 
-      const sysPost: ChannelPost = {
-        id: `sys-${Date.now()}`,
-        channel_id: selected.id,
-        sender_id: "system",
-        sender_name: "System",
-        message: `❌ ${successMsg}`,
-        file: null,
-        created_at: new Date().toISOString(),
-      };
-      setPostsByChannel((prev) => {
-        const key = String(selected.id);
-        return { ...prev, [key]: [...(prev[key] || []), sysPost] };
-      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to reject");
     } finally {

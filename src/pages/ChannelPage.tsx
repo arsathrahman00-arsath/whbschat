@@ -438,6 +438,10 @@ export default function ChannelPage() {
       const ch = selectedRef.current;
       if (!ws || ws.readyState !== WebSocket.OPEN || !ch) return false;
       if (!text && !file) return false;
+      if (!ch.is_admin) {
+        toast.error("Only admin can post in this channel");
+        return false;
+      }
 
       const tmpId = `tmp-${Date.now()}`;
       const optimistic: ChannelPost = {

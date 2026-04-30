@@ -3,6 +3,7 @@
 
 export const HTTP_BASE = "https://ngrchatbot.whindia.in";
 export const WS_CHANNEL_BASE = "wss://ngrchatbot.whindia.in/ws/channel";
+export const WS_USER_BASE = "wss://ngrchatbot.whindia.in/ws/chat";
 
 export const CHANNEL_ENDPOINTS = {
   create: `${HTTP_BASE}/chat/create_channel/`,

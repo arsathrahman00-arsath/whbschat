@@ -617,21 +617,6 @@ export default function ChannelPage() {
               )}
               <Button
                 size="sm"
-                variant="default"
-                onClick={handleApprove}
-                disabled={approving}
-                className="gap-1.5"
-                title="Bulk approve clean data for this channel"
-              >
-                {approving ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                )}
-                {approving ? "Approving…" : "Approve"}
-              </Button>
-              <Button
-                size="sm"
                 variant="ghost"
                 onClick={() => setMembersOpen(true)}
                 className="gap-1.5"

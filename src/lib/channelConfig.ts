@@ -3,6 +3,7 @@
 
 export const HTTP_BASE = "https://ngrchatbot.whindia.in";
 export const WS_CHANNEL_BASE = "wss://ngrchatbot.whindia.in/ws/channel";
+export const WS_USER_BASE = "wss://ngrchatbot.whindia.in/ws/chat";
 
 export const CHANNEL_ENDPOINTS = {
   create: `${HTTP_BASE}/chat/create_channel/`,
@@ -19,4 +20,8 @@ export const CHANNEL_ENDPOINTS = {
 
 export function channelWsUrl(channelId: string | number): string {
   return `${WS_CHANNEL_BASE}/${channelId}/`;
+}
+
+export function userWsUrl(userId: string | number): string {
+  return `${WS_USER_BASE}/${userId}/`;
 }

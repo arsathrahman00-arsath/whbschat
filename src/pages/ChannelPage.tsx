@@ -15,7 +15,7 @@ import ChannelSidebar from "@/components/channels/ChannelSidebar";
 import ChannelPosts from "@/components/channels/ChannelPosts";
 import ChannelComposer from "@/components/channels/ChannelComposer";
 import ChannelMembersDialog from "@/components/channels/ChannelMembersDialog";
-import { CHANNEL_ENDPOINTS, channelWsUrl } from "@/lib/channelConfig";
+import { CHANNEL_ENDPOINTS, channelWsUrl, userWsUrl } from "@/lib/channelConfig";
 import { mapToChannel, mapToChannelPost } from "@/lib/channelMappers";
 import { joinChannel } from "@/lib/channelMembersApi";
 import type { Channel, ChannelPost } from "@/lib/channelTypes";
@@ -229,6 +229,121 @@ export default function ChannelPage() {
       ws.close();
     };
   }, [selected, currentUserId]);
+
+  // ---- User-level WebSocket: global unread updates across all channels ----
+  // Stays open for the lifetime of the page; auto-reconnects with backoff.
+  useEffect(() => {
+    if (!currentUserId) return;
+    let userWs: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+    let attempts = 0;
+    let cancelled = false;
+
+    const applyUnreadUpdate = (d: any) => {
+      const cid = d.channel_id ?? d.data?.channel_id;
+      if (cid == null) return;
+      const unread =
+        typeof d.unread_count === "number"
+          ? d.unread_count
+          : typeof d.data?.unread_count === "number"
+            ? d.data.unread_count
+            : null;
+      const lastMsg = d.last_message ?? d.data?.last_message ?? null;
+      const ts = d.created_at ?? d.data?.created_at ?? null;
+      const senderId = d.sender_id ?? d.data?.sender_id ?? null;
+      const isOwn = senderId != null && String(senderId) === String(currentUserId);
+      // If the user is currently viewing this channel, never bump unread.
+      const viewing =
+        document.visibilityState === "visible" &&
+        String(selectedRef.current?.id) === String(cid);
+
+      setChannels((prev) => {
+        const idx = prev.findIndex((c) => String(c.id) === String(cid));
+        if (idx === -1) return prev;
+        const cur = prev[idx];
+        let nextUnread = cur.unread_count ?? 0;
+        if (viewing || isOwn) {
+          nextUnread = viewing ? 0 : nextUnread;
+        } else if (unread != null) {
+          nextUnread = unread;
+        } else {
+          nextUnread = nextUnread + 1;
+        }
+        const cleanPreview =
+          typeof lastMsg === "string"
+            ? lastMsg.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim()
+            : cur.last_message;
+        const updated: Channel = {
+          ...cur,
+          unread_count: nextUnread,
+          last_message: cleanPreview || cur.last_message || null,
+          last_message_time: ts || cur.last_message_time || new Date().toISOString(),
+        };
+        const next = [...prev];
+        next[idx] = updated;
+        return sortChannels(next);
+      });
+    };
+
+    const applyUnreadReset = (d: any) => {
+      const cid = d.channel_id ?? d.data?.channel_id;
+      if (cid == null) return;
+      setChannels((prev) =>
+        prev.map((c) =>
+          String(c.id) === String(cid) ? { ...c, unread_count: 0 } : c,
+        ),
+      );
+    };
+
+    const connect = () => {
+      if (cancelled) return;
+      try {
+        userWs = new WebSocket(userWsUrl(currentUserId));
+      } catch {
+        scheduleReconnect();
+        return;
+      }
+      userWs.onopen = () => {
+        attempts = 0;
+      };
+      userWs.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "channel_unread_update") applyUnreadUpdate(data);
+          else if (data.type === "channel_unread_reset") applyUnreadReset(data);
+        } catch {
+          /* ignore */
+        }
+      };
+      userWs.onclose = () => scheduleReconnect();
+      userWs.onerror = () => {
+        try {
+          userWs?.close();
+        } catch {
+          /* noop */
+        }
+      };
+    };
+
+    const scheduleReconnect = () => {
+      if (cancelled) return;
+      attempts += 1;
+      const delay = Math.min(30_000, 1000 * 2 ** Math.min(attempts, 5));
+      reconnectTimer = window.setTimeout(connect, delay);
+    };
+
+    connect();
+
+    return () => {
+      cancelled = true;
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      try {
+        userWs?.close();
+      } catch {
+        /* noop */
+      }
+    };
+  }, [currentUserId]);
 
   // ---- Handlers ----
   const markChannelRead = useCallback(

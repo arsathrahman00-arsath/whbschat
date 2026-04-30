@@ -15,6 +15,7 @@ export const CHANNEL_ENDPOINTS = {
   members: `${HTTP_BASE}/chat/get_channel_members/`,
   users: `${HTTP_BASE}/chat/get_users/`,
   approveCleanData: `${HTTP_BASE}/chat/approve_clean_data/`,
+  rejectCleanData: `${HTTP_BASE}/chat/reject_clean_data/`,
   markChannelRead: `${HTTP_BASE}/chat/mark_channel_read/`,
 };
 

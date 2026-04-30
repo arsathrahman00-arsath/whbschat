@@ -177,7 +177,7 @@ export default function ChannelSidebar({
                           {preview || (c.description ?? "")}
                         </p>
                         {hasUnread && (
-                          <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground text-[10px] font-bold shadow-sm animate-in fade-in zoom-in-50 duration-200">
+                          <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold shadow-sm animate-in fade-in zoom-in-50 duration-200">
                             {unread > 99 ? "99+" : unread}
                           </span>
                         )}

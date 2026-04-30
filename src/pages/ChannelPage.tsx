@@ -305,10 +305,12 @@ export default function ChannelPage() {
       }
       userWs.onopen = () => {
         attempts = 0;
+        console.log("USER WS CONNECTED");
       };
       userWs.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          console.log("USER WS EVENT:", data);
           if (data.type === "channel_unread_update") applyUnreadUpdate(data);
           else if (data.type === "channel_unread_reset") applyUnreadReset(data);
         } catch {

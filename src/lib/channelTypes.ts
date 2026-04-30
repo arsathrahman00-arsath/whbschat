@@ -26,6 +26,9 @@ export interface ChannelPost {
   message: string | null;
   file?: ChatAttachment | null;
   created_at: string;
+  // Backend-provided status for action messages (approve/reject HTML buttons).
+  // When set to approved/rejected we treat the buttons as permanently disabled.
+  status?: string | null;
   // UI-only
   uploading?: boolean;
   upload_error?: string | null;

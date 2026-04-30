@@ -1,15 +1,26 @@
 // Safely renders HTML content coming from backend chat messages.
 // - Sanitizes via DOMPurify
 // - Delegates clicks on elements with [data-action="approve"|"reject"]
-//   to onAction handler (currently logs to console).
-// - Scoped styling so embedded tables/buttons don't break chat layout.
+//   to onAction handler.
+// - When `actioned` is true (or a prior click was persisted for `messageId`),
+//   approve/reject buttons render permanently disabled.
+// - Persists the disabled state in localStorage so it survives reloads.
 
 import { useEffect, useMemo, useRef } from "react";
 import DOMPurify from "dompurify";
+import {
+  getMessageAction,
+  isMessageActioned,
+  setMessageAction,
+} from "@/lib/htmlActionState";
 
 interface Props {
   html: string;
   isMe: boolean;
+  /** Stable id of the chat message — used to persist action state. */
+  messageId?: string | number;
+  /** Authoritative backend status; if "approved"/"rejected" buttons stay disabled. */
+  status?: string | null;
   onAction?: (action: string, el: HTMLElement) => void;
 }
 
@@ -19,7 +30,25 @@ export function looksLikeHtml(s: string | null | undefined): boolean {
   return /<\/?[a-z][\s\S]*?>/i.test(s);
 }
 
-export default function HtmlMessage({ html, isMe, onAction }: Props) {
+function disableActionButtons(node: HTMLElement) {
+  const els = node.querySelectorAll<HTMLElement>("[data-action]");
+  els.forEach((el) => {
+    el.setAttribute("aria-disabled", "true");
+    el.setAttribute("data-used", "true");
+    if ("disabled" in el) (el as HTMLButtonElement).disabled = true;
+    el.style.opacity = "0.5";
+    el.style.cursor = "not-allowed";
+    el.style.pointerEvents = "none";
+  });
+}
+
+export default function HtmlMessage({
+  html,
+  isMe,
+  messageId,
+  status,
+  onAction,
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const clean = useMemo(
@@ -29,6 +58,16 @@ export default function HtmlMessage({ html, isMe, onAction }: Props) {
       }),
     [html],
   );
+
+  // After (re)render, if this message is already actioned (from backend status
+  // or from a persisted local click), disable the buttons immediately.
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+    if (isMessageActioned(messageId, status)) {
+      disableActionButtons(node);
+    }
+  }, [clean, messageId, status]);
 
   useEffect(() => {
     const node = containerRef.current;
@@ -40,41 +79,37 @@ export default function HtmlMessage({ html, isMe, onAction }: Props) {
       if (!actionEl) return;
       e.preventDefault();
       e.stopPropagation();
-      // Ignore if any action button in this message is already disabled.
+
+      // Block duplicate clicks: either an in-DOM disabled state OR a persisted
+      // action for this message.
       const allActionEls = node.querySelectorAll<HTMLElement>("[data-action]");
-      const alreadyUsed = Array.from(allActionEls).some(
+      const alreadyUsedDom = Array.from(allActionEls).some(
         (el) =>
           el.getAttribute("aria-disabled") === "true" ||
           (el as HTMLButtonElement).disabled,
       );
-      if (alreadyUsed) return;
+      if (alreadyUsedDom) return;
+      if (messageId != null && getMessageAction(messageId) != null) {
+        disableActionButtons(node);
+        return;
+      }
 
       const action = actionEl.getAttribute("data-action") || "";
-      if (action === "approve") console.log("Approved clicked");
-      else if (action === "reject") console.log("Rejected clicked");
 
-      // Disable both Approve and Reject after one is clicked.
-      allActionEls.forEach((el) => {
-        el.setAttribute("aria-disabled", "true");
-        el.setAttribute("data-used", "true");
-        if ("disabled" in el) (el as HTMLButtonElement).disabled = true;
-        el.style.opacity = "0.5";
-        el.style.cursor = "not-allowed";
-        el.style.pointerEvents = "none";
-      });
+      // Persist + disable immediately (optimistic).
+      if (messageId != null) setMessageAction(messageId, action);
+      disableActionButtons(node);
 
-      // Broadcast so page-level handlers (e.g. ChannelPage) can react
-      // without prop-drilling through every message component.
       window.dispatchEvent(
         new CustomEvent("html-message-action", {
-          detail: { action, element: actionEl },
+          detail: { action, element: actionEl, messageId },
         }),
       );
       onAction?.(action, actionEl);
     };
     node.addEventListener("click", handler);
     return () => node.removeEventListener("click", handler);
-  }, [clean, onAction]);
+  }, [clean, onAction, messageId]);
 
   return (
     <div

@@ -40,9 +40,29 @@ export default function HtmlMessage({ html, isMe, onAction }: Props) {
       if (!actionEl) return;
       e.preventDefault();
       e.stopPropagation();
+      // Ignore if any action button in this message is already disabled.
+      const allActionEls = node.querySelectorAll<HTMLElement>("[data-action]");
+      const alreadyUsed = Array.from(allActionEls).some(
+        (el) =>
+          el.getAttribute("aria-disabled") === "true" ||
+          (el as HTMLButtonElement).disabled,
+      );
+      if (alreadyUsed) return;
+
       const action = actionEl.getAttribute("data-action") || "";
       if (action === "approve") console.log("Approved clicked");
       else if (action === "reject") console.log("Rejected clicked");
+
+      // Disable both Approve and Reject after one is clicked.
+      allActionEls.forEach((el) => {
+        el.setAttribute("aria-disabled", "true");
+        el.setAttribute("data-used", "true");
+        if ("disabled" in el) (el as HTMLButtonElement).disabled = true;
+        el.style.opacity = "0.5";
+        el.style.cursor = "not-allowed";
+        el.style.pointerEvents = "none";
+      });
+
       // Broadcast so page-level handlers (e.g. ChannelPage) can react
       // without prop-drilling through every message component.
       window.dispatchEvent(

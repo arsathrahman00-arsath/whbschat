@@ -65,5 +65,11 @@ export function mapToChannelPost(raw: any, channelId: string | number): ChannelP
     message: raw.message ?? raw.text ?? null,
     file: extractFile(raw),
     created_at: raw.created_at || raw.time || new Date().toISOString(),
+    status:
+      raw.status ??
+      raw.action_status ??
+      raw.approval_status ??
+      raw.clean_data_status ??
+      null,
   };
 }

@@ -123,7 +123,12 @@ export default function ChannelPosts({ posts, loading }: Props) {
 
                 {p.message && (
                   looksLikeHtml(p.message) ? (
-                    <HtmlMessage html={p.message} isMe={false} />
+                    <HtmlMessage
+                      html={p.message}
+                      isMe={false}
+                      messageId={p.id}
+                      status={p.status}
+                    />
                   ) : (
                     <p className="text-sm whitespace-pre-wrap break-words text-foreground">
                       {p.message}

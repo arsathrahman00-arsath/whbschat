@@ -21,3 +21,7 @@ export const CHANNEL_ENDPOINTS = {
 export function channelWsUrl(channelId: string | number): string {
   return `${WS_CHANNEL_BASE}/${channelId}/`;
 }
+
+export function userWsUrl(userId: string | number): string {
+  return `${WS_USER_BASE}/${userId}/`;
+}

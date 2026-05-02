@@ -51,7 +51,7 @@ export default function MessageContextMenu({
     { label: "Reply", icon: Reply, action: onReply },
     { label: "Forward", icon: Forward, action: onForward },
     { label: "Copy", icon: Copy, action: onCopy },
-    ...(isMe ? [{ label: "Delete", icon: Trash2, action: onDelete }] : []),
+    { label: "Delete", icon: Trash2, action: onDelete },
   ];
 
   return (

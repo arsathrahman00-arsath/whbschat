@@ -190,6 +190,18 @@ export default function Chat() {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
 
+  // Auto-focus the message input when a chat is opened or a reply is selected.
+  useEffect(() => {
+    if (selectedUser) {
+      messageInputRef.current?.focus();
+    }
+  }, [selectedUser]);
+  useEffect(() => {
+    if (replyTo) {
+      messageInputRef.current?.focus();
+    }
+  }, [replyTo]);
+
   const messages = selectedUser ? messagesByUser[String(selectedUser.id)] || [] : [];
 
   /** Append a normalized message to a conversation, dedup by id. */

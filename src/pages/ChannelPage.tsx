@@ -658,6 +658,7 @@ export default function ChannelPage() {
               canPost={!!selected.is_admin}
               currentUserId={currentUserId}
               onSend={handleSendPost}
+              focusKey={String(selected.id)}
             />
 
             <ChannelMembersDialog

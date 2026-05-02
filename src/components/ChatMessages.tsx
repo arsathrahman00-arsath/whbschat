@@ -351,14 +351,32 @@ export default function ChatMessages({
                     onDelete({
                       id: deleteConfirm.id,
                       isMe: String(deleteConfirm.sender_id) === String(currentUserId),
+                      deleteType: "me",
                     });
                   }
                   setDeleteConfirm(null);
                 }}
-                className="w-full py-2.5 text-sm text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
+                className="w-full py-2.5 text-sm text-foreground hover:bg-muted rounded-xl transition-colors"
               >
-                Delete Message
+                Delete for me
               </button>
+              {String(deleteConfirm.sender_id) === String(currentUserId) && (
+                <button
+                  onClick={() => {
+                    if (onDelete && deleteConfirm.id) {
+                      onDelete({
+                        id: deleteConfirm.id,
+                        isMe: true,
+                        deleteType: "everyone",
+                      });
+                    }
+                    setDeleteConfirm(null);
+                  }}
+                  className="w-full py-2.5 text-sm text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
+                >
+                  Delete for everyone
+                </button>
+              )}
               <button
                 onClick={() => setDeleteConfirm(null)}
                 className="w-full py-2.5 text-sm text-muted-foreground hover:bg-muted rounded-xl transition-colors"

@@ -585,6 +585,7 @@ export default function ChannelPage() {
         channels={channels}
         selectedId={selected?.id ?? null}
         loading={loadingChannels}
+        currentUserId={currentUserId}
         onSelect={handleSelect}
         onCreate={handleCreate}
         onBackToChat={() => navigate("/chat")}

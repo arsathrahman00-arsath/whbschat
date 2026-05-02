@@ -294,45 +294,33 @@ export default function Chat() {
           const deleteType: "me" | "everyone" = data.delete_type === "me" ? "me" : "everyone";
           const targetUserId = data.user_id != null ? String(data.user_id) : null;
           const chatPeerHint = data.chat_id != null ? String(data.chat_id) : null;
+          const activePeerKey = selectedUserRef.current ? String(selectedUserRef.current.id) : null;
           // For "delete for me", only mutate if it's the current user's view.
           if (deleteType === "me" && targetUserId && targetUserId !== String(currentUserId)) {
             return;
           }
           setMessagesByUser((prev) => {
-            // Prefer targeting a single conversation when possible to avoid
-            // iterating every chat. Fall back to scanning all chats only when
-            // we can't determine the peer key from the payload.
-            const candidateKeys: string[] = [];
-            if (chatPeerHint && prev[chatPeerHint]) candidateKeys.push(chatPeerHint);
-            const keysToScan = candidateKeys.length ? candidateKeys : Object.keys(prev);
+            // Target one known conversation only: prefer backend chat_id, then
+            // the currently open chat. Without chat_id, the frontend cannot
+            // reliably identify an inactive peer without scanning every chat.
+            const peerKey = chatPeerHint || activePeerKey;
+            if (!peerKey) return prev;
+
+            const list = prev[peerKey];
+            if (!list?.some((m) => m.id === deletedId)) return prev;
+
+            if (deleteType === "me") {
+              return { ...prev, [peerKey]: list.filter((m) => m.id !== deletedId) };
+            }
 
             let changed = false;
-            const updated: typeof prev = { ...prev };
-            for (const key of keysToScan) {
-              const list = prev[key];
-              if (!list) continue;
-              if (deleteType === "me") {
-                const next = list.filter((m) => m.id !== deletedId);
-                if (next.length !== list.length) {
-                  updated[key] = next;
-                  changed = true;
-                  break; // a message id is unique to one conversation
-                }
-              } else {
-                let localChanged = false;
-                const next = list.map((m) => {
-                  if (m.id !== deletedId || m.deleted) return m;
-                  localChanged = true;
-                  return { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null };
-                });
-                if (localChanged) {
-                  updated[key] = next;
-                  changed = true;
-                  break;
-                }
-              }
-            }
-            return changed ? updated : prev;
+            const next = list.map((m) => {
+              if (m.id !== deletedId || m.deleted) return m;
+              changed = true;
+              return { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null };
+            });
+
+            return changed ? { ...prev, [peerKey]: next } : prev;
           });
           return;
         }

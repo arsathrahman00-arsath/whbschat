@@ -289,22 +289,35 @@ export default function Chat() {
         }
 
         if (data.type === "message_deleted") {
+          console.log("Delete event received", data);
           const deletedId = String(data.message_id);
           const deleteType: "me" | "everyone" = data.delete_type === "me" ? "me" : "everyone";
           const targetUserId = data.user_id != null ? String(data.user_id) : null;
+          const chatPeerHint = data.chat_id != null ? String(data.chat_id) : null;
           // For "delete for me", only mutate if it's the current user's view.
           if (deleteType === "me" && targetUserId && targetUserId !== String(currentUserId)) {
             return;
           }
           setMessagesByUser((prev) => {
+            // Prefer targeting a single conversation when possible to avoid
+            // iterating every chat. Fall back to scanning all chats only when
+            // we can't determine the peer key from the payload.
+            const candidateKeys: string[] = [];
+            if (chatPeerHint && prev[chatPeerHint]) candidateKeys.push(chatPeerHint);
+            const keysToScan = candidateKeys.length ? candidateKeys : Object.keys(prev);
+
             let changed = false;
-            const updated: typeof prev = {};
-            for (const key of Object.keys(prev)) {
+            const updated: typeof prev = { ...prev };
+            for (const key of keysToScan) {
               const list = prev[key];
+              if (!list) continue;
               if (deleteType === "me") {
                 const next = list.filter((m) => m.id !== deletedId);
-                if (next.length !== list.length) changed = true;
-                updated[key] = next;
+                if (next.length !== list.length) {
+                  updated[key] = next;
+                  changed = true;
+                  break; // a message id is unique to one conversation
+                }
               } else {
                 let localChanged = false;
                 const next = list.map((m) => {
@@ -312,8 +325,11 @@ export default function Chat() {
                   localChanged = true;
                   return { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null };
                 });
-                if (localChanged) changed = true;
-                updated[key] = localChanged ? next : list;
+                if (localChanged) {
+                  updated[key] = next;
+                  changed = true;
+                  break;
+                }
               }
             }
             return changed ? updated : prev;

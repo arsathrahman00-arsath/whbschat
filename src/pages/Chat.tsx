@@ -640,16 +640,27 @@ export default function Chat() {
     setForwardMsg(null);
   };
 
-  const handleDelete = (msg: { id: string; isMe: boolean }) => {
+  const handleDelete = (msg: { id: string; isMe: boolean; deleteType: "me" | "everyone" }) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: "delete_message", message_id: msg.id }));
+      wsRef.current.send(
+        JSON.stringify({
+          type: "delete_message",
+          message_id: msg.id,
+          user_id: currentUserId,
+          delete_type: msg.deleteType,
+        }),
+      );
     }
     setMessagesByUser((prev) => {
       const updated: typeof prev = {};
       for (const key of Object.keys(prev)) {
-        updated[key] = prev[key].map((m) =>
-          m.id === msg.id ? { ...m, deleted: true, message: "This message was deleted" } : m,
-        );
+        if (msg.deleteType === "me") {
+          updated[key] = prev[key].filter((m) => m.id !== msg.id);
+        } else {
+          updated[key] = prev[key].map((m) =>
+            m.id === msg.id ? { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null } : m,
+          );
+        }
       }
       return updated;
     });

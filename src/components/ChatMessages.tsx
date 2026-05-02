@@ -93,7 +93,10 @@ export default function ChatMessages({
         const data = await res.json();
         const msgs = Array.isArray(data) ? data : data.data || data.messages || data.results || [];
         if (cancelled) return;
-        setApiMessages(msgs.map((m: any) => mapToChatMessage(m, currentUserId)));
+        const filtered = msgs.filter(
+          (m: any) => !m?.cb_message_deleted && !m?.deleted_for_me,
+        );
+        setApiMessages(filtered.map((m: any) => mapToChatMessage(m, currentUserId)));
       } catch (err) {
         console.error("Failed to fetch messages:", err);
       } finally {

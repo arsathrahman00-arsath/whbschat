@@ -164,6 +164,7 @@ export default function ChannelComposer({ canPost, currentUserId, onSend, focusK
           <Paperclip className="h-5 w-5" />
         </Button>
         <Input
+          ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -175,6 +176,7 @@ export default function ChannelComposer({ canPost, currentUserId, onSend, focusK
           placeholder="Broadcast a message…"
           className="flex-1"
           disabled={uploading}
+          autoFocus
         />
         <Button
           onClick={handleSubmit}

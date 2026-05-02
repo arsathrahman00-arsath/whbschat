@@ -17,7 +17,7 @@ import ChannelComposer from "@/components/channels/ChannelComposer";
 import ChannelMembersDialog from "@/components/channels/ChannelMembersDialog";
 import { CHANNEL_ENDPOINTS, channelWsUrl, userWsUrl } from "@/lib/channelConfig";
 import { mapToChannel, mapToChannelPost } from "@/lib/channelMappers";
-import { joinChannel } from "@/lib/channelMembersApi";
+import { addUserToChannel, joinChannel } from "@/lib/channelMembersApi";
 import type { Channel, ChannelPost } from "@/lib/channelTypes";
 import type { ChatAttachment } from "@/lib/chatMessage";
 import channelImage from "@/assets/channel.jpg";

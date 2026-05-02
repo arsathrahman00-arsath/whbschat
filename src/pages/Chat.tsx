@@ -289,22 +289,35 @@ export default function Chat() {
         }
 
         if (data.type === "message_deleted") {
+          console.log("Delete event received", data);
           const deletedId = String(data.message_id);
           const deleteType: "me" | "everyone" = data.delete_type === "me" ? "me" : "everyone";
           const targetUserId = data.user_id != null ? String(data.user_id) : null;
+          const chatPeerHint = data.chat_id != null ? String(data.chat_id) : null;
           // For "delete for me", only mutate if it's the current user's view.
           if (deleteType === "me" && targetUserId && targetUserId !== String(currentUserId)) {
             return;
           }
           setMessagesByUser((prev) => {
+            // Prefer targeting a single conversation when possible to avoid
+            // iterating every chat. Fall back to scanning all chats only when
+            // we can't determine the peer key from the payload.
+            const candidateKeys: string[] = [];
+            if (chatPeerHint && prev[chatPeerHint]) candidateKeys.push(chatPeerHint);
+            const keysToScan = candidateKeys.length ? candidateKeys : Object.keys(prev);
+
             let changed = false;
-            const updated: typeof prev = {};
-            for (const key of Object.keys(prev)) {
+            const updated: typeof prev = { ...prev };
+            for (const key of keysToScan) {
               const list = prev[key];
+              if (!list) continue;
               if (deleteType === "me") {
                 const next = list.filter((m) => m.id !== deletedId);
-                if (next.length !== list.length) changed = true;
-                updated[key] = next;
+                if (next.length !== list.length) {
+                  updated[key] = next;
+                  changed = true;
+                  break; // a message id is unique to one conversation
+                }
               } else {
                 let localChanged = false;
                 const next = list.map((m) => {
@@ -312,8 +325,11 @@ export default function Chat() {
                   localChanged = true;
                   return { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null };
                 });
-                if (localChanged) changed = true;
-                updated[key] = localChanged ? next : list;
+                if (localChanged) {
+                  updated[key] = next;
+                  changed = true;
+                  break;
+                }
               }
             }
             return changed ? updated : prev;
@@ -660,6 +676,7 @@ export default function Chat() {
   };
 
   const handleDelete = (msg: { id: string; isMe: boolean; deleteType: "me" | "everyone" }) => {
+    const peerKey = selectedUser ? String(selectedUser.id) : null;
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(
         JSON.stringify({
@@ -667,21 +684,27 @@ export default function Chat() {
           message_id: msg.id,
           user_id: currentUserId,
           delete_type: msg.deleteType,
+          ...(peerKey ? { chat_id: peerKey } : {}),
         }),
       );
     }
     setMessagesByUser((prev) => {
-      const updated: typeof prev = {};
-      for (const key of Object.keys(prev)) {
-        if (msg.deleteType === "me") {
-          updated[key] = prev[key].filter((m) => m.id !== msg.id);
-        } else {
-          updated[key] = prev[key].map((m) =>
-            m.id === msg.id ? { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null } : m,
-          );
-        }
+      if (!peerKey || !prev[peerKey]) return prev;
+      const list = prev[peerKey];
+      let next: ChatMessage[];
+      if (msg.deleteType === "me") {
+        next = list.filter((m) => m.id !== msg.id);
+        if (next.length === list.length) return prev;
+      } else {
+        let changed = false;
+        next = list.map((m) => {
+          if (m.id !== msg.id || m.deleted) return m;
+          changed = true;
+          return { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null };
+        });
+        if (!changed) return prev;
       }
-      return updated;
+      return { ...prev, [peerKey]: next };
     });
   };
 

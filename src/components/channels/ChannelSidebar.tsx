@@ -1,12 +1,13 @@
 // Left sidebar listing channels the user belongs to.
 // Includes a "Create channel" button that opens an inline dialog.
 
-import { useState } from "react";
-import { Plus, Search, Loader2, ArrowLeft } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Search, Loader2, ArrowLeft, Check, UserX } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +17,9 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import type { Channel } from "@/lib/channelTypes";
+import { fetchChatUsers, type ChatUserLite } from "@/lib/chatUsersApi";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import channelImage from "@/assets/channel.jpg";
 import channelIcon from "@/assets/channel-icon.jpg";
 
@@ -23,8 +27,13 @@ interface Props {
   channels: Channel[];
   selectedId: string | number | null;
   loading: boolean;
+  currentUserId?: string | number;
   onSelect: (c: Channel) => void;
-  onCreate: (name: string, description: string) => Promise<void>;
+  onCreate: (
+    name: string,
+    description: string,
+    memberIds: Array<string | number>,
+  ) => Promise<void>;
   onBackToChat: () => void;
 }
 
@@ -59,6 +68,7 @@ export default function ChannelSidebar({
   channels,
   selectedId,
   loading,
+  currentUserId,
   onSelect,
   onCreate,
   onBackToChat,
@@ -69,17 +79,78 @@ export default function ChannelSidebar({
   const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
 
+  // Multi-select members for the new channel
+  const [users, setUsers] = useState<ChatUserLite[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [memberQuery, setMemberQuery] = useState("");
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+
   const filtered = channels.filter((c) =>
     c.name.toLowerCase().includes(query.toLowerCase()),
   );
+
+  // Load users when create dialog opens
+  useEffect(() => {
+    if (!openCreate) return;
+    let cancelled = false;
+    (async () => {
+      setUsersLoading(true);
+      try {
+        const list = await fetchChatUsers();
+        if (!cancelled) setUsers(list);
+      } catch (err) {
+        if (!cancelled) {
+          toast.error(err instanceof Error ? err.message : "Failed to load users");
+        }
+      } finally {
+        if (!cancelled) setUsersLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [openCreate]);
+
+  const memberOptions = useMemo(() => {
+    const q = memberQuery.trim().toLowerCase();
+    return users.filter((u) => {
+      if (currentUserId != null && String(u.id) === String(currentUserId)) return false;
+      if (!q) return true;
+      return (
+        u.username.toLowerCase().includes(q) ||
+        String(u.id).toLowerCase().includes(q) ||
+        (u.user_code?.toLowerCase().includes(q) ?? false)
+      );
+    });
+  }, [users, memberQuery, currentUserId]);
+
+  const toggleMember = (id: string | number) => {
+    const key = String(id);
+    setSelectedMemberIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const resetCreateForm = () => {
+    setName("");
+    setDescription("");
+    setSelectedMemberIds(new Set());
+    setMemberQuery("");
+  };
 
   const handleCreate = async () => {
     if (!name.trim()) return;
     setCreating(true);
     try {
-      await onCreate(name.trim(), description.trim());
-      setName("");
-      setDescription("");
+      await onCreate(
+        name.trim(),
+        description.trim(),
+        Array.from(selectedMemberIds),
+      );
+      resetCreateForm();
       setOpenCreate(false);
     } finally {
       setCreating(false);
@@ -191,7 +262,13 @@ export default function ChannelSidebar({
         )}
       </ScrollArea>
 
-      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+      <Dialog
+        open={openCreate}
+        onOpenChange={(o) => {
+          setOpenCreate(o);
+          if (!o) resetCreateForm();
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Create channel</DialogTitle>
@@ -204,6 +281,7 @@ export default function ChannelSidebar({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="My Channel"
                 maxLength={64}
+                autoFocus
               />
             </div>
             <div className="space-y-1.5">
@@ -215,6 +293,74 @@ export default function ChannelSidebar({
                 rows={3}
                 maxLength={280}
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">
+                  Add members
+                  {selectedMemberIds.size > 0 && (
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">
+                      ({selectedMemberIds.size} selected)
+                    </span>
+                  )}
+                </label>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={memberQuery}
+                  onChange={(e) => setMemberQuery(e.target.value)}
+                  placeholder="Search users…"
+                  className="pl-8 h-9"
+                />
+              </div>
+              <ScrollArea className="h-44 rounded-md border">
+                {usersLoading ? (
+                  <div className="flex items-center justify-center py-8 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : memberOptions.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-xs text-muted-foreground">
+                    <UserX className="h-5 w-5 mb-1 opacity-60" />
+                    {memberQuery.trim() ? "No matching users" : "No users available"}
+                  </div>
+                ) : (
+                  <ul className="p-1">
+                    {memberOptions.map((u) => {
+                      const isSelected = selectedMemberIds.has(String(u.id));
+                      return (
+                        <li key={String(u.id)}>
+                          <button
+                            type="button"
+                            onClick={() => toggleMember(u.id)}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors",
+                              isSelected
+                                ? "bg-primary/10 hover:bg-primary/15"
+                                : "hover:bg-muted/60",
+                            )}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleMember(u.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="shrink-0"
+                            />
+                            <Avatar className="h-7 w-7">
+                              <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-[10px]">
+                                {getInitials(u.username)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm truncate flex-1">{u.username}</span>
+                            {isSelected && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </ScrollArea>
             </div>
           </div>
           <DialogFooter>

@@ -131,6 +131,7 @@ export default function Chat() {
   const [isUploading, setIsUploading] = useState(false);
   const dragCounterRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const messageInputRef = useRef<HTMLInputElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const usersRef = useRef<ChatUser[]>([]);
@@ -188,6 +189,18 @@ export default function Chat() {
   useEffect(() => {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
+
+  // Auto-focus the message input when a chat is opened or a reply is selected.
+  useEffect(() => {
+    if (selectedUser) {
+      messageInputRef.current?.focus();
+    }
+  }, [selectedUser]);
+  useEffect(() => {
+    if (replyTo) {
+      messageInputRef.current?.focus();
+    }
+  }, [replyTo]);
 
   const messages = selectedUser ? messagesByUser[String(selectedUser.id)] || [] : [];
 
@@ -954,12 +967,14 @@ export default function Chat() {
 
                 <div className="flex-1 flex items-end bg-white rounded-[21px] shadow-sm min-h-[42px]">
                   <input
+                    ref={messageInputRef}
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={previewFile ? "Add a caption…" : "Message"}
                     className="flex-1 bg-transparent px-[14px] py-[9px] text-[15px] text-[#000000] placeholder:text-[#a2acb4] focus:outline-none leading-[22px]"
+                    autoFocus
                   />
                 </div>
                 {input.trim() || previewFile ? (

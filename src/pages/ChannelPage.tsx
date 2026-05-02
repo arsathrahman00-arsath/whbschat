@@ -17,7 +17,7 @@ import ChannelComposer from "@/components/channels/ChannelComposer";
 import ChannelMembersDialog from "@/components/channels/ChannelMembersDialog";
 import { CHANNEL_ENDPOINTS, channelWsUrl, userWsUrl } from "@/lib/channelConfig";
 import { mapToChannel, mapToChannelPost } from "@/lib/channelMappers";
-import { joinChannel } from "@/lib/channelMembersApi";
+import { addUserToChannel, joinChannel } from "@/lib/channelMembersApi";
 import type { Channel, ChannelPost } from "@/lib/channelTypes";
 import type { ChatAttachment } from "@/lib/chatMessage";
 import channelImage from "@/assets/channel.jpg";
@@ -393,7 +393,11 @@ export default function ChannelPage() {
     setTimeout(() => markChannelRead(c.id), 200);
   };
 
-  const handleCreate = async (name: string, description: string) => {
+  const handleCreate = async (
+    name: string,
+    description: string,
+    memberIds: Array<string | number> = [],
+  ) => {
     if (!currentUserId) return;
     try {
       const res = await fetch(CHANNEL_ENDPOINTS.create, {
@@ -411,8 +415,6 @@ export default function ChannelPage() {
         throw new Error(json?.message || json?.error || `Create failed (${res.status})`);
       }
       const created = json.data || json.channel || json;
-      // Backend create response often returns only channel_id; merge submitted
-      // form values so the UI shows the correct name/description immediately.
       const merged = {
         ...created,
         id: created.id ?? created.channel_id ?? json.channel_id,
@@ -427,6 +429,35 @@ export default function ChannelPage() {
       });
       setSelected(ch);
       toast.success("Channel created");
+
+      // Add selected members (best-effort; report failures without aborting).
+      if (memberIds.length > 0) {
+        const results = await Promise.allSettled(
+          memberIds.map((userId) =>
+            addUserToChannel({
+              channelId: ch.id,
+              userId,
+              adminId: currentUserId,
+              role: "member",
+            }),
+          ),
+        );
+        const added = results.filter((r) => r.status === "fulfilled").length;
+        const failed = results.length - added;
+        if (added > 0) {
+          toast.success(added === 1 ? "1 member added" : `${added} members added`);
+        }
+        if (failed > 0) {
+          const firstErr = results.find((r) => r.status === "rejected") as
+            | PromiseRejectedResult
+            | undefined;
+          toast.error(
+            firstErr?.reason instanceof Error
+              ? firstErr.reason.message
+              : `Failed to add ${failed} member${failed > 1 ? "s" : ""}`,
+          );
+        }
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create channel");
       throw err;
@@ -585,6 +616,7 @@ export default function ChannelPage() {
         channels={channels}
         selectedId={selected?.id ?? null}
         loading={loadingChannels}
+        currentUserId={currentUserId}
         onSelect={handleSelect}
         onCreate={handleCreate}
         onBackToChat={() => navigate("/chat")}
@@ -658,6 +690,7 @@ export default function ChannelPage() {
               canPost={!!selected.is_admin}
               currentUserId={currentUserId}
               onSend={handleSendPost}
+              focusKey={String(selected.id)}
             />
 
             <ChannelMembersDialog

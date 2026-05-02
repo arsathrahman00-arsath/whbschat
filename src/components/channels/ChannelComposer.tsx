@@ -7,7 +7,7 @@
 // Non-admins see a disabled, read-only state with a "View only" hint and
 // the message: "Only admin can post in this channel".
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Send, Paperclip, X, Loader2, FileText, Film, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,14 +19,24 @@ interface Props {
   canPost: boolean;
   currentUserId: string | number;
   onSend: (text: string, file: ChatAttachment | null) => boolean;
+  /** Changes whenever the active channel changes — used to re-focus input. */
+  focusKey?: string | number;
 }
 
-export default function ChannelComposer({ canPost, currentUserId, onSend }: Props) {
+export default function ChannelComposer({ canPost, currentUserId, onSend, focusKey }: Props) {
   const [text, setText] = useState("");
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Auto-focus the message input when the channel changes (and on mount).
+  useEffect(() => {
+    if (canPost) {
+      inputRef.current?.focus();
+    }
+  }, [canPost, focusKey]);
 
   // Non-admin: read-only composer with clear messaging.
   if (!canPost) {
@@ -154,6 +164,7 @@ export default function ChannelComposer({ canPost, currentUserId, onSend }: Prop
           <Paperclip className="h-5 w-5" />
         </Button>
         <Input
+          ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -165,6 +176,7 @@ export default function ChannelComposer({ canPost, currentUserId, onSend }: Prop
           placeholder="Broadcast a message…"
           className="flex-1"
           disabled={uploading}
+          autoFocus
         />
         <Button
           onClick={handleSubmit}

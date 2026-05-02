@@ -15,7 +15,7 @@ interface ChatMessagesProps {
   localMessages: ChatMessage[];
   onReply?: (msg: { id: string; text: string; isMe: boolean }) => void;
   onForward?: (msg: { id: string; text: string; file: ChatMessage["file"] }) => void;
-  onDelete?: (msg: { id: string; isMe: boolean }) => void;
+  onDelete?: (msg: { id: string; isMe: boolean; deleteType: "me" | "everyone" }) => void;
 }
 
 const API_BASE = "https://ngrchatbot.whindia.in";

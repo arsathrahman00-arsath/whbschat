@@ -297,19 +297,26 @@ export default function Chat() {
             return;
           }
           setMessagesByUser((prev) => {
+            let changed = false;
             const updated: typeof prev = {};
             for (const key of Object.keys(prev)) {
+              const list = prev[key];
               if (deleteType === "me") {
-                updated[key] = prev[key].filter((m) => m.id !== deletedId);
+                const next = list.filter((m) => m.id !== deletedId);
+                if (next.length !== list.length) changed = true;
+                updated[key] = next;
               } else {
-                updated[key] = prev[key].map((m) =>
-                  m.id === deletedId
-                    ? { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null }
-                    : m,
-                );
+                let localChanged = false;
+                const next = list.map((m) => {
+                  if (m.id !== deletedId || m.deleted) return m;
+                  localChanged = true;
+                  return { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null };
+                });
+                if (localChanged) changed = true;
+                updated[key] = localChanged ? next : list;
               }
             }
-            return updated;
+            return changed ? updated : prev;
           });
           return;
         }

@@ -15,7 +15,7 @@ interface ChatMessagesProps {
   localMessages: ChatMessage[];
   onReply?: (msg: { id: string; text: string; isMe: boolean }) => void;
   onForward?: (msg: { id: string; text: string; file: ChatMessage["file"] }) => void;
-  onDelete?: (msg: { id: string; isMe: boolean }) => void;
+  onDelete?: (msg: { id: string; isMe: boolean; deleteType: "me" | "everyone" }) => void;
 }
 
 const API_BASE = "https://ngrchatbot.whindia.in";
@@ -93,7 +93,10 @@ export default function ChatMessages({
         const data = await res.json();
         const msgs = Array.isArray(data) ? data : data.data || data.messages || data.results || [];
         if (cancelled) return;
-        setApiMessages(msgs.map((m: any) => mapToChatMessage(m, currentUserId)));
+        const filtered = msgs.filter(
+          (m: any) => !m?.cb_message_deleted && !m?.deleted_for_me,
+        );
+        setApiMessages(filtered.map((m: any) => mapToChatMessage(m, currentUserId)));
       } catch (err) {
         console.error("Failed to fetch messages:", err);
       } finally {
@@ -351,14 +354,32 @@ export default function ChatMessages({
                     onDelete({
                       id: deleteConfirm.id,
                       isMe: String(deleteConfirm.sender_id) === String(currentUserId),
+                      deleteType: "me",
                     });
                   }
                   setDeleteConfirm(null);
                 }}
-                className="w-full py-2.5 text-sm text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
+                className="w-full py-2.5 text-sm text-foreground hover:bg-muted rounded-xl transition-colors"
               >
-                Delete Message
+                Delete for me
               </button>
+              {String(deleteConfirm.sender_id) === String(currentUserId) && (
+                <button
+                  onClick={() => {
+                    if (onDelete && deleteConfirm.id) {
+                      onDelete({
+                        id: deleteConfirm.id,
+                        isMe: true,
+                        deleteType: "everyone",
+                      });
+                    }
+                    setDeleteConfirm(null);
+                  }}
+                  className="w-full py-2.5 text-sm text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
+                >
+                  Delete for everyone
+                </button>
+              )}
               <button
                 onClick={() => setDeleteConfirm(null)}
                 className="w-full py-2.5 text-sm text-muted-foreground hover:bg-muted rounded-xl transition-colors"

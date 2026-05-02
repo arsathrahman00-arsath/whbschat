@@ -290,12 +290,24 @@ export default function Chat() {
 
         if (data.type === "message_deleted") {
           const deletedId = String(data.message_id);
+          const deleteType: "me" | "everyone" = data.delete_type === "me" ? "me" : "everyone";
+          const targetUserId = data.user_id != null ? String(data.user_id) : null;
+          // For "delete for me", only mutate if it's the current user's view.
+          if (deleteType === "me" && targetUserId && targetUserId !== String(currentUserId)) {
+            return;
+          }
           setMessagesByUser((prev) => {
             const updated: typeof prev = {};
             for (const key of Object.keys(prev)) {
-              updated[key] = prev[key].map((m) =>
-                m.id === deletedId ? { ...m, deleted: true, message: "This message was deleted" } : m,
-              );
+              if (deleteType === "me") {
+                updated[key] = prev[key].filter((m) => m.id !== deletedId);
+              } else {
+                updated[key] = prev[key].map((m) =>
+                  m.id === deletedId
+                    ? { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null }
+                    : m,
+                );
+              }
             }
             return updated;
           });
@@ -640,16 +652,27 @@ export default function Chat() {
     setForwardMsg(null);
   };
 
-  const handleDelete = (msg: { id: string; isMe: boolean }) => {
+  const handleDelete = (msg: { id: string; isMe: boolean; deleteType: "me" | "everyone" }) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: "delete_message", message_id: msg.id }));
+      wsRef.current.send(
+        JSON.stringify({
+          type: "delete_message",
+          message_id: msg.id,
+          user_id: currentUserId,
+          delete_type: msg.deleteType,
+        }),
+      );
     }
     setMessagesByUser((prev) => {
       const updated: typeof prev = {};
       for (const key of Object.keys(prev)) {
-        updated[key] = prev[key].map((m) =>
-          m.id === msg.id ? { ...m, deleted: true, message: "This message was deleted" } : m,
-        );
+        if (msg.deleteType === "me") {
+          updated[key] = prev[key].filter((m) => m.id !== msg.id);
+        } else {
+          updated[key] = prev[key].map((m) =>
+            m.id === msg.id ? { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null } : m,
+          );
+        }
       }
       return updated;
     });

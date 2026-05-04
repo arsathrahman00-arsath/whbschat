@@ -7,7 +7,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { WifiOff, MessageCircle, Users, UserPlus, Loader2, CheckCircle2 } from "lucide-react";
+import { WifiOff, MessageCircle, Users, UserPlus, Loader2, CheckCircle2, LogOut } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -69,6 +79,9 @@ export default function ChannelPage() {
   const [joining, setJoining] = useState(false);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [membersRefreshKey, setMembersRefreshKey] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const selectedRef = useRef<Channel | null>(null);
@@ -147,6 +160,53 @@ export default function ChannelPage() {
               String(c.id) === String(cid) ? { ...c, unread_count: 0 } : c,
             ),
           );
+          return;
+        }
+
+        // Server error frames
+        if (data.type === "error") {
+          toast.error(data.message || "Something went wrong");
+          return;
+        }
+
+        // Member left a channel (current user or someone else)
+        if (data.type === "member_left") {
+          const cid = data.channel_id;
+          const leftUserId = data.user_id;
+          const leftUsername = data.username;
+          const isSelf = String(leftUserId) === String(currentUserId);
+
+          if (isSelf) {
+            toast.success("You left the channel");
+            // Drop channel from list and close the chat screen.
+            setChannels((prev) =>
+              prev.filter((c) => String(c.id) !== String(cid)),
+            );
+            setPostsByChannel((prev) => {
+              const next = { ...prev };
+              delete next[String(cid)];
+              return next;
+            });
+            if (String(selectedRef.current?.id) === String(cid)) {
+              setSelected(null);
+              setMembersOpen(false);
+              setLeaveOpen(false);
+            }
+          } else {
+            toast.info(`${leftUsername || "A member"} left the channel`);
+            // Update members count and refresh members dialog if open.
+            setChannels((prev) =>
+              prev.map((c) =>
+                String(c.id) === String(cid)
+                  ? {
+                      ...c,
+                      members_count: Math.max(0, (c.members_count ?? 1) - 1),
+                    }
+                  : c,
+              ),
+            );
+            setMembersRefreshKey((k) => k + 1);
+          }
           return;
         }
 
@@ -518,6 +578,30 @@ export default function ChannelPage() {
     }
   };
 
+  const handleLeave = () => {
+    const ws = wsRef.current;
+    const ch = selectedRef.current;
+    if (!ch || !currentUserId) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      toast.error("Not connected. Please try again.");
+      return;
+    }
+    setLeaving(true);
+    try {
+      ws.send(
+        JSON.stringify({
+          type: "leave_channel",
+          user_id: currentUserId,
+        }),
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to leave channel");
+    } finally {
+      setLeaving(false);
+      setLeaveOpen(false);
+    }
+  };
+
   const handleApprove = async () => {
     if (!selected || approving) return;
     setApproving(true);
@@ -682,6 +766,17 @@ export default function ChannelPage() {
                   <span className="text-xs">{selected.members_count}</span>
                 ) : null}
               </Button>
+              {!selected.is_admin && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setLeaveOpen(true)}
+                  className="gap-1.5 text-destructive hover:text-destructive"
+                  title="Leave channel"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              )}
             </header>
 
             <ChannelPosts posts={posts} loading={loadingPosts && posts.length === 0} />
@@ -699,7 +794,36 @@ export default function ChannelPage() {
               channelId={selected.id}
               isAdmin={!!selected.is_admin}
               adminId={currentUserId}
+              refreshKey={membersRefreshKey}
             />
+
+            <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Leave Channel?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to leave this channel?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={leaving}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleLeave();
+                    }}
+                    disabled={leaving}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {leaving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Leave"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </>
         )}
       </main>

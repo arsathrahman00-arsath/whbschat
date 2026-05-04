@@ -25,6 +25,8 @@ interface Props {
   channelId: string | number;
   isAdmin: boolean;
   adminId: string | number;
+  /** Bump to force a members reload (e.g. when a member_left event arrives). */
+  refreshKey?: number;
 }
 
 function initials(name: string) {
@@ -37,6 +39,7 @@ export default function ChannelMembersDialog({
   channelId,
   isAdmin,
   adminId,
+  refreshKey,
 }: Props) {
   const [members, setMembers] = useState<ChannelMember[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,7 +60,7 @@ export default function ChannelMembersDialog({
   useEffect(() => {
     if (open) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, channelId]);
+  }, [open, channelId, refreshKey]);
 
   return (
     <>

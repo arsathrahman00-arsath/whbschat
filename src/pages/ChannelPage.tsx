@@ -794,7 +794,36 @@ export default function ChannelPage() {
               channelId={selected.id}
               isAdmin={!!selected.is_admin}
               adminId={currentUserId}
+              refreshKey={membersRefreshKey}
             />
+
+            <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Leave Channel?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to leave this channel?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={leaving}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleLeave();
+                    }}
+                    disabled={leaving}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {leaving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Leave"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </>
         )}
       </main>

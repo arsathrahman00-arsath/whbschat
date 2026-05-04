@@ -300,27 +300,51 @@ export default function Chat() {
             return;
           }
           setMessagesByUser((prev) => {
-            // Target one known conversation only: prefer backend chat_id, then
-            // the currently open chat. Without chat_id, the frontend cannot
-            // reliably identify an inactive peer without scanning every chat.
-            const peerKey = chatPeerHint || activePeerKey;
-            if (!peerKey) return prev;
+            // Backend sends chat_id (deterministic hash), but our state is
+            // keyed by peer user id. The mapping isn't 1:1, so scan every
+            // conversation and update wherever the message exists. This
+            // also keeps background chats consistent without a refresh.
+            let changed = false;
+            const updated: Record<string, ChatMessage[]> = {};
 
-            const list = prev[peerKey];
-            if (!list?.some((m) => m.id === deletedId)) return prev;
+            for (const key of Object.keys(prev)) {
+              const list = prev[key];
+              if (!list || !list.some((m) => m.id === deletedId)) {
+                updated[key] = list;
+                continue;
+              }
 
-            if (deleteType === "me") {
-              return { ...prev, [peerKey]: list.filter((m) => m.id !== deletedId) };
+              if (deleteType === "me") {
+                updated[key] = list.filter((m) => m.id !== deletedId);
+                changed = true;
+                continue;
+              }
+
+              let listChanged = false;
+              const next = list.map((m) => {
+                if (m.id !== deletedId || m.deleted) return m;
+                listChanged = true;
+                return {
+                  ...m,
+                  deleted: true,
+                  message: "This message was deleted",
+                  file: null,
+                  reply_to: null,
+                };
+              });
+              if (listChanged) {
+                updated[key] = next;
+                changed = true;
+              } else {
+                updated[key] = list;
+              }
             }
 
-            let changed = false;
-            const next = list.map((m) => {
-              if (m.id !== deletedId || m.deleted) return m;
-              changed = true;
-              return { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null };
-            });
+            // Suppress unused-var lint for hints — kept for future routing.
+            void chatPeerHint;
+            void activePeerKey;
 
-            return changed ? { ...prev, [peerKey]: next } : prev;
+            return changed ? updated : prev;
           });
           return;
         }

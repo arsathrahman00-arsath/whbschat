@@ -163,6 +163,53 @@ export default function ChannelPage() {
           return;
         }
 
+        // Server error frames
+        if (data.type === "error") {
+          toast.error(data.message || "Something went wrong");
+          return;
+        }
+
+        // Member left a channel (current user or someone else)
+        if (data.type === "member_left") {
+          const cid = data.channel_id;
+          const leftUserId = data.user_id;
+          const leftUsername = data.username;
+          const isSelf = String(leftUserId) === String(currentUserId);
+
+          if (isSelf) {
+            toast.success("You left the channel");
+            // Drop channel from list and close the chat screen.
+            setChannels((prev) =>
+              prev.filter((c) => String(c.id) !== String(cid)),
+            );
+            setPostsByChannel((prev) => {
+              const next = { ...prev };
+              delete next[String(cid)];
+              return next;
+            });
+            if (String(selectedRef.current?.id) === String(cid)) {
+              setSelected(null);
+              setMembersOpen(false);
+              setLeaveOpen(false);
+            }
+          } else {
+            toast.info(`${leftUsername || "A member"} left the channel`);
+            // Update members count and refresh members dialog if open.
+            setChannels((prev) =>
+              prev.map((c) =>
+                String(c.id) === String(cid)
+                  ? {
+                      ...c,
+                      members_count: Math.max(0, (c.members_count ?? 1) - 1),
+                    }
+                  : c,
+              ),
+            );
+            setMembersRefreshKey((k) => k + 1);
+          }
+          return;
+        }
+
         // Backends commonly use one of these for new posts.
         const isPost =
           data.type === "channel_post" ||

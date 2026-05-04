@@ -766,6 +766,17 @@ export default function ChannelPage() {
                   <span className="text-xs">{selected.members_count}</span>
                 ) : null}
               </Button>
+              {!selected.is_admin && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setLeaveOpen(true)}
+                  className="gap-1.5 text-destructive hover:text-destructive"
+                  title="Leave channel"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              )}
             </header>
 
             <ChannelPosts posts={posts} loading={loadingPosts && posts.length === 0} />

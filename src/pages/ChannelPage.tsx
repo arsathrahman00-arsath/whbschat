@@ -578,6 +578,30 @@ export default function ChannelPage() {
     }
   };
 
+  const handleLeave = () => {
+    const ws = wsRef.current;
+    const ch = selectedRef.current;
+    if (!ch || !currentUserId) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      toast.error("Not connected. Please try again.");
+      return;
+    }
+    setLeaving(true);
+    try {
+      ws.send(
+        JSON.stringify({
+          type: "leave_channel",
+          user_id: currentUserId,
+        }),
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to leave channel");
+    } finally {
+      setLeaving(false);
+      setLeaveOpen(false);
+    }
+  };
+
   const handleApprove = async () => {
     if (!selected || approving) return;
     setApproving(true);

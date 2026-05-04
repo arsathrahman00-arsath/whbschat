@@ -25,6 +25,8 @@ interface Props {
   channelId: string | number;
   isAdmin: boolean;
   adminId: string | number;
+  /** Bump to force a members reload (e.g. when a member_left event arrives). */
+  refreshKey?: number;
 }
 
 function initials(name: string) {

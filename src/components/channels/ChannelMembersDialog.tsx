@@ -39,6 +39,7 @@ export default function ChannelMembersDialog({
   channelId,
   isAdmin,
   adminId,
+  refreshKey,
 }: Props) {
   const [members, setMembers] = useState<ChannelMember[]>([]);
   const [loading, setLoading] = useState(false);

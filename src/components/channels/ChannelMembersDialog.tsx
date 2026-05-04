@@ -60,7 +60,7 @@ export default function ChannelMembersDialog({
   useEffect(() => {
     if (open) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, channelId]);
+  }, [open, channelId, refreshKey]);
 
   return (
     <>

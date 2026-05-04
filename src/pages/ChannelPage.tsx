@@ -79,6 +79,9 @@ export default function ChannelPage() {
   const [joining, setJoining] = useState(false);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [membersRefreshKey, setMembersRefreshKey] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const selectedRef = useRef<Channel | null>(null);

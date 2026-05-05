@@ -35,7 +35,10 @@ function previewFromMessage(text: string | null | undefined, fileName?: string |
   const t = (text || "").trim();
   if (t) {
     // Strip HTML tags for sidebar preview only
-    const stripped = t.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const stripped = t
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     return stripped || (fileName ? `📎 ${fileName}` : "");
   }
   if (fileName) return `📎 ${fileName}`;
@@ -314,12 +317,23 @@ export default function Chat() {
                 continue;
               }
 
+              // if (deleteType === "me") {
+              //   updated[key] = list.filter((m) => m.id !== deletedId);
+              //   changed = true;
+              //   continue;
+              // }
               if (deleteType === "me") {
-                updated[key] = list.filter((m) => m.id !== deletedId);
-                changed = true;
-                continue;
-              }
+                setMessagesByUser((prev) => {
+                  const updated: Record<string, ChatMessage[]> = {};
 
+                  for (const key of Object.keys(prev)) {
+                    updated[key] = prev[key].filter((m) => m.id !== deletedId);
+                  }
+
+                  return updated;
+                });
+                return;
+              }
               let listChanged = false;
               const next = list.map((m) => {
                 if (m.id !== deletedId || m.deleted) return m;
@@ -667,8 +681,7 @@ export default function Chat() {
   };
 
   const handleReply = (msg: { id: string; text: string; isMe: boolean }) => setReplyTo(msg);
-  const handleForwardRequest = (msg: { id: string; text: string; file: ChatAttachment | null }) =>
-    setForwardMsg(msg);
+  const handleForwardRequest = (msg: { id: string; text: string; file: ChatAttachment | null }) => setForwardMsg(msg);
 
   const handleForwardSend = (targetUserIds: (string | number)[]) => {
     if (!forwardMsg || wsRef.current?.readyState !== WebSocket.OPEN) return;
@@ -864,9 +877,7 @@ export default function Chat() {
                               status.isActive ? "text-green-500" : "text-muted-foreground"
                             }`}
                           >
-                            {status.isActive && (
-                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
-                            )}
+                            {status.isActive && <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />}
                             {status.text}
                           </p>
                         ) : (

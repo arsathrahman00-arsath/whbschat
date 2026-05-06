@@ -602,7 +602,7 @@ export default function ChannelPage() {
     }
   };
 
-  const handleApprove = async () => {
+  const handleApprove = async (code?: string) => {
     if (!selected || approving) return;
     setApproving(true);
     try {
@@ -613,10 +613,13 @@ export default function ChannelPage() {
       const match = arr.find((c: any) => String(c.id) === String(selected.id));
       const channel_id = match?.id ?? selected.id;
 
+      const payload: Record<string, unknown> = { channel_id };
+      if (code) payload.code = code;
+
       const res = await fetch(CHANNEL_ENDPOINTS.approveCleanData, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channel_id }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.status === "error") {
@@ -637,7 +640,7 @@ export default function ChannelPage() {
     }
   };
 
-  const handleReject = async () => {
+  const handleReject = async (code?: string) => {
     if (!selected || rejecting) return;
     setRejecting(true);
     try {
@@ -647,10 +650,13 @@ export default function ChannelPage() {
       const match = arr.find((c: any) => String(c.id) === String(selected.id));
       const channel_id = match?.id ?? selected.id;
 
+      const payload: Record<string, unknown> = { channel_id };
+      if (code) payload.code = code;
+
       const res = await fetch(CHANNEL_ENDPOINTS.rejectCleanData, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channel_id }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.status === "error") {
@@ -681,11 +687,11 @@ export default function ChannelPage() {
   });
   useEffect(() => {
     const onAction = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { action?: string } | undefined;
+      const detail = (e as CustomEvent).detail as { action?: string; code?: string } | undefined;
       if (detail?.action === "approve") {
-        handleApproveRef.current();
+        handleApproveRef.current(detail.code);
       } else if (detail?.action === "reject") {
-        handleRejectRef.current();
+        handleRejectRef.current(detail.code);
       }
     };
     window.addEventListener("html-message-action", onAction);

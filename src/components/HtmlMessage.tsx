@@ -95,6 +95,7 @@ export default function HtmlMessage({
       }
 
       const action = actionEl.getAttribute("data-action") || "";
+      const code = actionEl.getAttribute("data-code") || undefined;
 
       // Persist + disable immediately (optimistic).
       if (messageId != null) setMessageAction(messageId, action);
@@ -102,7 +103,7 @@ export default function HtmlMessage({
 
       window.dispatchEvent(
         new CustomEvent("html-message-action", {
-          detail: { action, element: actionEl, messageId },
+          detail: { action, element: actionEl, messageId, code },
         }),
       );
       onAction?.(action, actionEl);

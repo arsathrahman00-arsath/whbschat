@@ -89,13 +89,11 @@ export default function ChatMessages({
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/chat/get_chat_messages/?chat_id=${chatId}`);
+        const res = await fetch(`${API_BASE}/chat/get_chat_messages/?chat_id=${chatId}&user_id=${currentUserId}`);
         const data = await res.json();
         const msgs = Array.isArray(data) ? data : data.data || data.messages || data.results || [];
         if (cancelled) return;
-        const filtered = msgs.filter(
-          (m: any) => !m?.cb_message_deleted && !m?.deleted_for_me,
-        );
+        const filtered = msgs.filter((m: any) => !m?.cb_message_deleted && !m?.deleted_for_me);
         setApiMessages(filtered.map((m: any) => mapToChatMessage(m, currentUserId)));
       } catch (err) {
         console.error("Failed to fetch messages:", err);
@@ -252,8 +250,10 @@ export default function ChatMessages({
             <Attachment file={m.file} isMe={isMe} uploading={m.uploading} uploadError={m.upload_error} />
           )}
 
-          {(!hasFile || hasCaption) && !m.deleted && hasText && (
-            looksLikeHtml(text) ? (
+          {(!hasFile || hasCaption) &&
+            !m.deleted &&
+            hasText &&
+            (looksLikeHtml(text) ? (
               <div className={hasFile ? "block px-[9px] py-[6px]" : ""}>
                 <HtmlMessage html={text} isMe={isMe} messageId={m.id} />
               </div>
@@ -261,8 +261,7 @@ export default function ChatMessages({
               <span className={`break-words whitespace-pre-wrap ${hasFile ? "block px-[9px] py-[6px]" : ""}`}>
                 {text}
               </span>
-            )
-          )}
+            ))}
           {m.deleted && <span className="break-words whitespace-pre-wrap">{text}</span>}
 
           {!m.deleted && (

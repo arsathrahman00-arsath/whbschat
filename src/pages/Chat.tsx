@@ -773,9 +773,18 @@ export default function Chat() {
       if (!peerKey || !prev[peerKey]) return prev;
       const list = prev[peerKey];
       let next: ChatMessage[];
+      //
       if (msg.deleteType === "me") {
         next = list.filter((m) => m.id !== msg.id);
+
         if (next.length === list.length) return prev;
+
+        // remove empty conversation
+        if (next.length === 0) {
+          const copy = { ...prev };
+          delete copy[peerKey];
+          return copy;
+        }
       } else {
         let changed = false;
         next = list.map((m) => {

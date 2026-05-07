@@ -299,9 +299,9 @@ export default function Chat() {
           const chatPeerHint = data.chat_id != null ? String(data.chat_id) : null;
           const activePeerKey = selectedUserRef.current ? String(selectedUserRef.current.id) : null;
           // For "delete for me", only mutate if it's the current user's view.
-          if (deleteType === "me" && targetUserId && targetUserId !== String(currentUserId)) {
-            return;
-          }
+          // if (deleteType === "me" && targetUserId && targetUserId !== String(currentUserId)) {
+          //   return;
+          // }
           setMessagesByUser((prev) => {
             // Backend sends chat_id (deterministic hash), but our state is
             // keyed by peer user id. The mapping isn't 1:1, so scan every

@@ -384,6 +384,11 @@ export default function Chat() {
                   changed = true;
                 }
 
+                // remove empty conversation
+                if (filtered.length === 0) {
+                  continue;
+                }
+
                 updated[key] = filtered;
                 continue;
               }
@@ -419,6 +424,7 @@ export default function Chat() {
 
           return;
         }
+
         // Accept the canonical "chat_message" plus a few common backend
         // variants. Also accept any payload that has both sender_id and
         // (message OR file) — that's a chat message regardless of the label.

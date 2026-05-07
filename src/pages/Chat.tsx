@@ -681,7 +681,7 @@ export default function Chat() {
   };
 
   const handleDelete = (msg: { id: string; isMe: boolean; deleteType: "me" | "everyone" }) => {
-    const peerKey = selectedUser ? String(selectedUser.id) : null;
+    const currentChatId = selectedUser ? generateChatId(currentUserId, selectedUser.id) : chatId;
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(
         JSON.stringify({
@@ -689,65 +689,11 @@ export default function Chat() {
           message_id: msg.id,
           user_id: currentUserId,
           delete_type: msg.deleteType,
-          ...(peerKey ? { chat_id: peerKey } : {}),
+          ...(currentChatId ? { chat_id: currentChatId } : {}),
         }),
       );
     }
-    setMessagesByUser((prev) => {
-      const updated: Record<string, ChatMessage[]> = {};
-
-      Object.keys(prev).forEach((key) => {
-        const list = prev[key];
-
-        if (msg.deleteType === "me") {
-          updated[key] = list.filter((m) => m.id !== msg.id);
-        } else {
-          updated[key] = list.map((m) => {
-            if (m.id !== msg.id) return m;
-
-            return {
-              ...m,
-              deleted: true,
-              message: "This message was deleted",
-              file: null,
-              reply_to: null,
-            };
-          });
-        }
-      });
-      return updated;
-    });
-    // setMessagesByUser((prev) => {
-    //   if (!peerKey || !prev[peerKey]) return prev;
-    //   const list = prev[peerKey];
-    //   let next: ChatMessage[];
-    //   //
-    //   // if (msg.deleteType === "me") {
-    //   // next = list.filter((m) => m.id !== msg.id);
-
-    //   // if (next.length === list.length) return prev;
-
-    //   // remove empty conversation
-    //   //   if (next.length === 0) {
-    //   //     const copy = { ...prev };
-    //   //     delete copy[peerKey];
-    //   //     return copy;
-    //   //   }
-    //   // }
-    //   if (msg.deleteType === "me") {
-    //     next = list.filter((m) => m.id !== msg.id);
-    //     if (next.length === list.length) return prev;
-    //   } else {
-    //     let changed = false;
-    //     next = list.map((m) => {
-    //       if (m.id !== msg.id || m.deleted) return m;
-    //       changed = true;
-    //       return { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null };
-    //     });
-    //     if (!changed) return prev;
-    //   }
-    //   return { ...prev, [peerKey]: next };
-    // });
+    applyDeletedMessage(msg.id, msg.deleteType);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

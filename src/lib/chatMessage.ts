@@ -58,6 +58,10 @@ export function kindFromMime(mime: string | undefined): AttachmentKind {
   return "document";
 }
 
+function truthyFlag(value: unknown): boolean {
+  return value === true || value === 1 || value === "1" || value === "true";
+}
+
 /**
  * Normalize anything that looks like a chat message (history API row,
  * WebSocket broadcast, or local optimistic object) into a ChatMessage.
@@ -119,7 +123,7 @@ export function mapToChatMessage(raw: any, currentUserId: string | number): Chat
     sender_id: senderId,
     receiver_id: receiverId,
     message: raw.message ?? raw.text ?? null,
-    deleted: Boolean(raw.deleted),
+    deleted: truthyFlag(raw.deleted) || truthyFlag(raw.cb_message_deleted) || truthyFlag(raw.is_deleted),
     created_at: raw.created_at || raw.time || new Date().toISOString(),
     reply_to: reply,
     file,

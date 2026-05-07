@@ -93,7 +93,7 @@ export default function ChatMessages({
         const data = await res.json();
         const msgs = Array.isArray(data) ? data : data.data || data.messages || data.results || [];
         if (cancelled) return;
-        const filtered = msgs.filter((m: any) => !m?.cb_message_deleted && !m?.deleted_for_me);
+        const filtered = msgs.filter((m: any) => !m?.deleted_for_me);
         setApiMessages(filtered.map((m: any) => mapToChatMessage(m, currentUserId)));
       } catch (err) {
         console.error("Failed to fetch messages:", err);
@@ -123,13 +123,16 @@ export default function ChatMessages({
         map.set(m.id, m);
         return;
       }
+      const isDeleted = existing.deleted || m.deleted;
       map.set(m.id, {
         ...existing,
         ...m,
-        file: m.file ?? existing.file ?? null,
-        reply_to: m.reply_to ?? existing.reply_to ?? null,
-        uploading: m.uploading ?? false,
-        upload_error: m.upload_error ?? null,
+        deleted: isDeleted,
+        message: isDeleted ? "This message was deleted" : m.message,
+        file: isDeleted ? null : (m.file ?? existing.file ?? null),
+        reply_to: isDeleted ? null : (m.reply_to ?? existing.reply_to ?? null),
+        uploading: isDeleted ? false : (m.uploading ?? false),
+        upload_error: isDeleted ? null : (m.upload_error ?? null),
       });
     });
     // return Array.from(map.values()).sort(

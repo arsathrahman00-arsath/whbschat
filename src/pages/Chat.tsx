@@ -236,6 +236,51 @@ export default function Chat() {
     });
   }, []);
 
+  const applyDeletedMessage = useCallback((messageId: string | number, deleteType: "me" | "everyone") => {
+    const deletedId = String(messageId);
+    setMessagesByUser((prev) => {
+      let changed = false;
+      const updated: Record<string, ChatMessage[]> = {};
+
+      for (const key of Object.keys(prev)) {
+        const list = prev[key] || [];
+        if (!list.some((m) => m.id === deletedId)) {
+          updated[key] = list;
+          continue;
+        }
+
+        if (deleteType === "me") {
+          updated[key] = list.filter((m) => m.id !== deletedId);
+          changed = true;
+          continue;
+        }
+
+        updated[key] = list.map((m) =>
+          m.id === deletedId
+            ? { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null, uploading: false, upload_error: null }
+            : m,
+        );
+        changed = true;
+      }
+
+      return changed ? updated : prev;
+    });
+
+    if (deleteType === "everyone") {
+      setChatMetaByUser((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const key of Object.keys(messagesByUserRef.current)) {
+          if (messagesByUserRef.current[key]?.some((m) => m.id === deletedId) && next[key]) {
+            next[key] = { ...next[key], lastPreview: "This message was deleted" };
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+  }, []);
+
   const connectWebSocket = useCallback(() => {
     if (!currentUserId) return;
     if (wsRef.current) wsRef.current.close();
@@ -293,48 +338,8 @@ export default function Chat() {
 
         if (data.type === "message_deleted") {
           console.log("Delete event received", data);
-          const deletedId = String(data.message_id);
           const deleteType: "me" | "everyone" = data.delete_type === "me" ? "me" : "everyone";
-
-          setMessagesByUser((prev) => {
-            let changed = false;
-            const updated: Record<string, ChatMessage[]> = {};
-
-            for (const key of Object.keys(prev)) {
-              const list = prev[key];
-              if (!list || !list.some((m) => m.id === deletedId)) {
-                updated[key] = list;
-                continue;
-              }
-
-              if (deleteType === "me") {
-                updated[key] = list.filter((m) => m.id !== deletedId);
-                changed = true;
-                continue;
-              }
-
-              let listChanged = false;
-              const next = list.map((m) => {
-                if (m.id !== deletedId || m.deleted) return m;
-                listChanged = true;
-                return {
-                  ...m,
-                  deleted: true,
-                  message: "This message was deleted",
-                  file: null,
-                  reply_to: null,
-                };
-              });
-              if (listChanged) {
-                updated[key] = next;
-                changed = true;
-              } else {
-                updated[key] = list;
-              }
-            }
-
-            return changed ? updated : prev;
-          });
+          applyDeletedMessage(data.message_id, deleteType);
           return;
         }
 
@@ -425,7 +430,7 @@ export default function Chat() {
     };
 
     ws.onerror = (err) => console.error("WebSocket error:", err);
-  }, [currentUserId, appendMessage, bumpMeta]);
+  }, [currentUserId, appendMessage, bumpMeta, applyDeletedMessage]);
 
   useEffect(() => {
     if (!session) {

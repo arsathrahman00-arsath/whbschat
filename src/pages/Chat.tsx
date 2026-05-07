@@ -689,36 +689,60 @@ export default function Chat() {
       );
     }
     setMessagesByUser((prev) => {
-      if (!peerKey || !prev[peerKey]) return prev;
-      const list = prev[peerKey];
-      let next: ChatMessage[];
-      //
-      // if (msg.deleteType === "me") {
-      // next = list.filter((m) => m.id !== msg.id);
+      const updated: Record<string, ChatMessage[]> = {};
 
-      // if (next.length === list.length) return prev;
+      Object.keys(prev).forEach((key) => {
+        const list = prev[key];
 
-      // remove empty conversation
-      //   if (next.length === 0) {
-      //     const copy = { ...prev };
-      //     delete copy[peerKey];
-      //     return copy;
-      //   }
-      // }
-      if (msg.deleteType === "me") {
-        next = list.filter((m) => m.id !== msg.id);
-        if (next.length === list.length) return prev;
-      } else {
-        let changed = false;
-        next = list.map((m) => {
-          if (m.id !== msg.id || m.deleted) return m;
-          changed = true;
-          return { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null };
-        });
-        if (!changed) return prev;
-      }
-      return { ...prev, [peerKey]: next };
+        if (msg.deleteType === "me") {
+          updated[key] = list.filter((m) => m.id !== msg.id);
+        } else {
+          updated[key] = list.map((m) => {
+            if (m.id !== msg.id) return m;
+
+            return {
+              ...m,
+              deleted: true,
+              message: "This message was deleted",
+              file: null,
+              reply_to: null,
+            };
+          });
+        }
+      });
+      return updated;
     });
+    // setMessagesByUser((prev) => {
+    //   if (!peerKey || !prev[peerKey]) return prev;
+    //   const list = prev[peerKey];
+    //   let next: ChatMessage[];
+    //   //
+    //   // if (msg.deleteType === "me") {
+    //   // next = list.filter((m) => m.id !== msg.id);
+
+    //   // if (next.length === list.length) return prev;
+
+    //   // remove empty conversation
+    //   //   if (next.length === 0) {
+    //   //     const copy = { ...prev };
+    //   //     delete copy[peerKey];
+    //   //     return copy;
+    //   //   }
+    //   // }
+    //   if (msg.deleteType === "me") {
+    //     next = list.filter((m) => m.id !== msg.id);
+    //     if (next.length === list.length) return prev;
+    //   } else {
+    //     let changed = false;
+    //     next = list.map((m) => {
+    //       if (m.id !== msg.id || m.deleted) return m;
+    //       changed = true;
+    //       return { ...m, deleted: true, message: "This message was deleted", file: null, reply_to: null };
+    //     });
+    //     if (!changed) return prev;
+    //   }
+    //   return { ...prev, [peerKey]: next };
+    // });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

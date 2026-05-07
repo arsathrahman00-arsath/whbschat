@@ -927,6 +927,7 @@ export default function Chat() {
               currentUserId={currentUserId}
               selectedUsername={selectedUser.username}
               localMessages={messages}
+              deletionOverrides={deletedMessagesById}
               onReply={handleReply}
               onForward={handleForwardRequest}
               onDelete={handleDelete}

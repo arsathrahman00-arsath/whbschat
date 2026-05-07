@@ -13,6 +13,7 @@ interface ChatMessagesProps {
   selectedUsername: string;
   /** Already-normalized live messages (optimistic + WS) for this conversation. */
   localMessages: ChatMessage[];
+  deletionOverrides?: Record<string, "me" | "everyone">;
   onReply?: (msg: { id: string; text: string; isMe: boolean }) => void;
   onForward?: (msg: { id: string; text: string; file: ChatMessage["file"] }) => void;
   onDelete?: (msg: { id: string; isMe: boolean; deleteType: "me" | "everyone" }) => void;
@@ -69,6 +70,7 @@ export default function ChatMessages({
   currentUserId,
   selectedUsername,
   localMessages,
+  deletionOverrides = {},
   onReply,
   onForward,
   onDelete,
@@ -115,9 +117,34 @@ export default function ChatMessages({
   // broadcasts sometimes omit them) and keep `uploading`/`upload_error`
   // from the local optimistic copy until the server message lands.
   const merged: ChatMessage[] = (() => {
+    const applyDeleteOverride = (m: ChatMessage): ChatMessage | null => {
+      const override = deletionOverrides[m.id];
+      if (override === "me") return null;
+      if (override === "everyone") {
+        return {
+          ...m,
+          deleted: true,
+          message: "This message was deleted",
+          file: null,
+          reply_to: null,
+          uploading: false,
+          upload_error: null,
+        };
+      }
+      return m;
+    };
+
     const map = new Map<string, ChatMessage>();
-    apiMessages.forEach((m) => map.set(m.id, m));
-    localMessages.forEach((m) => {
+    apiMessages.forEach((m) => {
+      const nextMessage = applyDeleteOverride(m);
+      if (nextMessage) map.set(nextMessage.id, nextMessage);
+    });
+    localMessages.forEach((localMessage) => {
+      const m = applyDeleteOverride(localMessage);
+      if (!m) {
+        map.delete(localMessage.id);
+        return;
+      }
       const existing = map.get(m.id);
       if (!existing) {
         map.set(m.id, m);

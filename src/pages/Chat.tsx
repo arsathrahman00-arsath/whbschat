@@ -119,6 +119,7 @@ export default function Chat() {
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
   // Conversation key = peer userId (string). Stored as ChatMessage[] (live + optimistic).
   const [messagesByUser, setMessagesByUser] = useState<Record<string, ChatMessage[]>>({});
+  const [deletedMessagesById, setDeletedMessagesById] = useState<Record<string, "me" | "everyone">>({});
   const [userStatuses, setUserStatuses] = useState<Record<string, UserStatusInfo>>({});
   const [input, setInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -238,6 +239,7 @@ export default function Chat() {
 
   const applyDeletedMessage = useCallback((messageId: string | number, deleteType: "me" | "everyone") => {
     const deletedId = String(messageId);
+    setDeletedMessagesById((prev) => ({ ...prev, [deletedId]: deleteType }));
     setMessagesByUser((prev) => {
       let changed = false;
       const updated: Record<string, ChatMessage[]> = {};

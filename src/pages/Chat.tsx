@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, LogOut, Search, MessageCircle, WifiOff, X, Smile, Paperclip, FileText, Film, ArrowLeft, Menu } from "lucide-react";
+import { Send, LogOut, Search, MessageCircle, WifiOff, X, Smile, Paperclip, FileText, Film, ArrowLeft } from "lucide-react";
 import logo from "@/assets/logo.jpg";
 import channelIcon from "@/assets/channel-icon.jpg";
 import ChatMessages from "@/components/ChatMessages";

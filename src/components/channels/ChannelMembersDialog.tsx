@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import AddMemberDialog from "./AddMemberDialog";
 import { fetchChannelMembers } from "@/lib/channelMembersApi";
 import type { ChannelMember } from "@/lib/channelTypes";
+import { toProperCase } from "@/lib/utils";
 
 interface Props {
   open: boolean;

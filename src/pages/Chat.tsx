@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, LogOut, Search, MessageCircle, WifiOff, X, Smile, Paperclip, FileText, Film } from "lucide-react";
+import { Send, LogOut, Search, MessageCircle, WifiOff, X, Smile, Paperclip, FileText, Film, ArrowLeft, Menu } from "lucide-react";
 import logo from "@/assets/logo.jpg";
 import channelIcon from "@/assets/channel-icon.jpg";
 import ChatMessages from "@/components/ChatMessages";
@@ -726,10 +726,19 @@ export default function Chat() {
   const selectedStatusDisplay = formatStatusDisplay(selectedUserStatusInfo);
 
   return (
-    <div className="flex h-screen bg-white overflow-hidden">
-      {/* Sidebar */}
+    <div className="flex h-[100dvh] bg-white overflow-hidden">
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-30 bg-black/40 animate-fade-in"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      {/* Sidebar — slide-over drawer on mobile, static on desktop */}
       <div
-        className={`${sidebarOpen ? "w-80" : "w-0"} md:w-80 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col transition-all duration-200 overflow-hidden`}
+        className={`fixed md:static z-40 inset-y-0 left-0 w-[85%] max-w-[20rem] md:w-80 md:max-w-none flex-shrink-0 border-r border-gray-200 bg-white flex flex-col transition-transform duration-200 ease-out md:translate-x-0 ${
+          sidebarOpen ? "translate-x-0 shadow-2xl md:shadow-none" : "-translate-x-full"
+        }`}
       >
         <div className="h-16 px-4 flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-[#1E90FF] to-[#22C55E]">
           <div className="flex items-center gap-2">

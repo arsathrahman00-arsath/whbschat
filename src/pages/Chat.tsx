@@ -7,6 +7,7 @@ import logo from "@/assets/logo.jpg";
 import channelIcon from "@/assets/channel-icon.jpg";
 import ChatMessages from "@/components/ChatMessages";
 import ForwardModal from "@/components/ForwardModal";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { generateChatId } from "@/lib/chatId";
 import {
   mapToChatMessage,

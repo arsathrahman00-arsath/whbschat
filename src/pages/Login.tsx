@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FormField } from "@/components/FormField";
+import { PasswordField } from "@/components/PasswordField";
 import { ResponseBanner } from "@/components/ResponseBanner";
 import { ForgotPassword } from "@/components/ForgotPassword";
 import { Loader2 } from "lucide-react";
@@ -88,15 +89,15 @@ export default function Login() {
               error={errors.username}
               required
             />
-            <FormField
+            <PasswordField
               label="Password"
               name="password"
-              type="password"
               placeholder="Enter your password"
               value={password}
               onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: undefined })); }}
               error={errors.password}
               required
+              autoComplete="current-password"
             />
 
             <div className="flex justify-end -mt-2">

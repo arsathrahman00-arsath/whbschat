@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Send, Search, Check } from "lucide-react";
+import { toProperCase } from "@/lib/utils";
 
 interface ForwardUser {
   id: number | string;
@@ -81,7 +82,7 @@ export default function ForwardModal({ open, onClose, users, messageText, onForw
                     {getInitials(user.username)}
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-sm font-medium text-gray-900 flex-1 text-left">{user.username}</span>
+                <span className="text-sm font-medium text-gray-900 flex-1 text-left">{toProperCase(user.username)}</span>
                 {isSelected && (
                   <div className="h-5 w-5 rounded-full bg-[#1E90FF] flex items-center justify-center">
                     <Check className="h-3 w-3 text-white" />

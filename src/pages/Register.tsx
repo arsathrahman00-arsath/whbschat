@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/FormField";
+import { PasswordField } from "@/components/PasswordField";
 import { AvatarUpload } from "@/components/AvatarUpload";
 import { ResponseBanner } from "@/components/ResponseBanner";
 import { getDeviceToken } from "@/lib/firebase";
@@ -123,7 +124,7 @@ export default function Register() {
               <FormField label="Username" name="username" placeholder="johndoe" value={form.username} onChange={onChange} error={errors.username} required />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Password" name="password" type="password" placeholder="Min 6 characters" value={form.password} onChange={onChange} error={errors.password} required />
+              <PasswordField label="Password" name="password" placeholder="Min 6 characters" value={form.password} onChange={onChange} error={errors.password} required autoComplete="new-password" />
               <FormField label="Display Name" name="display_name" placeholder="John Doe" value={form.display_name} onChange={onChange} error={errors.display_name} required />
             </div>
           </fieldset>

@@ -19,6 +19,7 @@ import {
 import { uploadAttachment } from "@/lib/uploadAttachment";
 import { sendChatMessage } from "@/lib/wsSend";
 import { toast } from "sonner";
+import { toProperCase } from "@/lib/utils";
 
 interface ChatUser {
   id: number | string;
@@ -74,7 +75,7 @@ interface ReplyTo {
 const WS_BASE_URL = "wss://ngrchatbot.whindia.in/ws/chat";
 
 function getInitials(name: string) {
-  return name.slice(0, 2).toUpperCase();
+  return toProperCase(name).replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase() || name.slice(0, 2).toUpperCase();
 }
 
 function getAvatarColor(name: string) {
@@ -824,7 +825,7 @@ export default function Chat() {
                         <p
                           className={`text-sm font-medium truncate ${isSelected ? "text-[#8B5CF6]" : "text-gray-900"}`}
                         >
-                          {user.username}
+                          {toProperCase(user.username)}
                         </p>
                         {hasActivity && meta?.lastActivity ? (
                           <span
@@ -878,7 +879,7 @@ export default function Chat() {
                 {session?.username ? getInitials(session.username) : "?"}
               </AvatarFallback>
             </Avatar>
-            <p className="text-sm font-medium text-gray-900 truncate">{session?.username || "User"}</p>
+            <p className="text-sm font-medium text-gray-900 truncate">{toProperCase(session?.username) || "User"}</p>
           </div>
         </div>
       </div>
@@ -922,7 +923,7 @@ export default function Chat() {
                 </AvatarFallback>
               </Avatar>
               <div>
-                <p className="text-base font-semibold text-gray-900">{selectedUser.username}</p>
+                <p className="text-base font-semibold text-gray-900">{toProperCase(selectedUser.username)}</p>
                 {selectedStatusDisplay.text && (
                   <p
                     className={`text-xs flex items-center gap-1 ${selectedStatusDisplay.isActive ? "text-green-500" : "text-muted-foreground"}`}
@@ -939,7 +940,7 @@ export default function Chat() {
             <ChatMessages
               chatId={chatId}
               currentUserId={currentUserId}
-              selectedUsername={selectedUser.username}
+              selectedUsername={toProperCase(selectedUser.username)}
               localMessages={messages}
               deletionOverrides={deletedMessagesById}
               onReply={handleReply}
@@ -953,7 +954,7 @@ export default function Chat() {
                   <div className="flex items-center gap-2 px-3 py-[6px] rounded-xl bg-white/80 border-l-[3px] border-[#3390ec]">
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-semibold text-[#3390ec] leading-tight">
-                        {replyTo.isMe ? "You" : selectedUser.username}
+                        {replyTo.isMe ? "You" : toProperCase(selectedUser.username)}
                       </p>
                       <p className="text-[13px] text-[#707579] truncate leading-tight">{replyTo.text}</p>
                     </div>

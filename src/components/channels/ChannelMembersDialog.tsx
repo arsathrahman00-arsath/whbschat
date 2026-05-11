@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import AddMemberDialog from "./AddMemberDialog";
 import { fetchChannelMembers } from "@/lib/channelMembersApi";
 import type { ChannelMember } from "@/lib/channelTypes";
+import { toProperCase } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -107,7 +108,7 @@ export default function ChannelMembersDialog({
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{m.username}</p>
+                      <p className="text-sm font-medium truncate">{toProperCase(m.username)}</p>
                       <p className="text-xs text-muted-foreground truncate">
                         ID: {String(m.user_id)}
                       </p>

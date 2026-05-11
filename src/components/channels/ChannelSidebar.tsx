@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Channel } from "@/lib/channelTypes";
 import { fetchChatUsers, type ChatUserLite } from "@/lib/chatUsersApi";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, toProperCase } from "@/lib/utils";
 import channelImage from "@/assets/channel.jpg";
 import channelIcon from "@/assets/channel-icon.jpg";
 
@@ -352,7 +352,7 @@ export default function ChannelSidebar({
                                 {getInitials(u.username)}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="text-sm truncate flex-1">{u.username}</span>
+                            <span className="text-sm truncate flex-1">{toProperCase(u.username)}</span>
                             {isSelected && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
                           </button>
                         </li>

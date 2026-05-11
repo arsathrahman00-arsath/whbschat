@@ -116,6 +116,7 @@ function formatStatusDisplay(info: UserStatusInfo | undefined): { text: string; 
 
 export default function Chat() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [users, setUsersState] = useState<ChatUser[]>([]);
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
   // Conversation key = peer userId (string). Stored as ChatMessage[] (live + optimistic).

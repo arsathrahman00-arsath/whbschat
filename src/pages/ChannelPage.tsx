@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { WifiOff, MessageCircle, Users, UserPlus, Loader2, CheckCircle2, LogOut } from "lucide-react";
+import { WifiOff, MessageCircle, Users, UserPlus, Loader2, CheckCircle2, LogOut, ArrowLeft } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +32,7 @@ import type { Channel, ChannelPost } from "@/lib/channelTypes";
 import type { ChatAttachment } from "@/lib/chatMessage";
 import channelImage from "@/assets/channel.jpg";
 import channelIcon from "@/assets/channel-icon.jpg";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 function readSession() {
   try {
@@ -65,6 +66,7 @@ function sortChannels(list: Channel[]): Channel[] {
 
 export default function ChannelPage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const session = readSession();
   const currentUserId = session?.userId || session?.id;
   const currentUsername: string | undefined = session?.username;
@@ -701,18 +703,20 @@ export default function ChannelPage() {
   const posts = selected ? postsByChannel[String(selected.id)] || [] : [];
 
   return (
-    <div className="h-screen flex bg-background">
-      <ChannelSidebar
-        channels={channels}
-        selectedId={selected?.id ?? null}
-        loading={loadingChannels}
-        currentUserId={currentUserId}
-        onSelect={handleSelect}
-        onCreate={handleCreate}
-        onBackToChat={() => navigate("/chat")}
-      />
+    <div className="h-[100dvh] flex bg-background overflow-hidden">
+      {(!isMobile || !selected) && (
+        <ChannelSidebar
+          channels={channels}
+          selectedId={selected?.id ?? null}
+          loading={loadingChannels}
+          currentUserId={currentUserId}
+          onSelect={handleSelect}
+          onCreate={handleCreate}
+          onBackToChat={() => navigate("/chat")}
+        />
+      )}
 
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className={`${isMobile && !selected ? "hidden" : "flex"} flex-1 flex-col min-w-0`}>
         {!selected ? (
           <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
             <MessageCircle className="h-12 w-12 mb-3 opacity-40" />
@@ -720,7 +724,14 @@ export default function ChannelPage() {
           </div>
         ) : (
           <>
-            <header className="border-b bg-card px-4 py-3 flex items-center gap-3">
+            <header className="border-b bg-card px-3 md:px-4 py-3 flex items-center gap-2 md:gap-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+              <button
+                onClick={() => setSelected(null)}
+                className="md:hidden -ml-1 p-2 rounded-lg text-muted-foreground hover:bg-muted active:bg-muted"
+                aria-label="Back"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
               <Avatar className="h-10 w-10">
                 <AvatarImage src={channelImage} alt={`${selected.name} channel`} className="object-cover" />
                 <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-sm">

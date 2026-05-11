@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, LogOut, Search, MessageCircle, WifiOff, X, Smile, Paperclip, FileText, Film } from "lucide-react";
+import { Send, LogOut, Search, MessageCircle, WifiOff, X, Smile, Paperclip, FileText, Film, ArrowLeft, Menu } from "lucide-react";
 import logo from "@/assets/logo.jpg";
 import channelIcon from "@/assets/channel-icon.jpg";
 import ChatMessages from "@/components/ChatMessages";
@@ -726,10 +726,19 @@ export default function Chat() {
   const selectedStatusDisplay = formatStatusDisplay(selectedUserStatusInfo);
 
   return (
-    <div className="flex h-screen bg-white overflow-hidden">
-      {/* Sidebar */}
+    <div className="flex h-[100dvh] bg-white overflow-hidden">
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-30 bg-black/40 animate-fade-in"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      {/* Sidebar — slide-over drawer on mobile, static on desktop */}
       <div
-        className={`${sidebarOpen ? "w-80" : "w-0"} md:w-80 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col transition-all duration-200 overflow-hidden`}
+        className={`fixed md:static z-40 inset-y-0 left-0 w-[85%] max-w-[20rem] md:w-80 md:max-w-none flex-shrink-0 border-r border-gray-200 bg-white flex flex-col transition-transform duration-200 ease-out md:translate-x-0 ${
+          sidebarOpen ? "translate-x-0 shadow-2xl md:shadow-none" : "-translate-x-full"
+        }`}
       >
         <div className="h-16 px-4 flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-[#1E90FF] to-[#22C55E]">
           <div className="flex items-center gap-2">
@@ -893,12 +902,16 @@ export default function Chat() {
 
         {selectedUser ? (
           <>
-            <div className="h-16 px-4 md:px-6 flex items-center gap-3 border-b border-gray-200 bg-white">
+            <div className="sticky top-0 z-20 h-16 px-3 md:px-6 flex items-center gap-3 border-b border-gray-200 bg-white pt-[env(safe-area-inset-top)]">
               <button
-                onClick={() => setSidebarOpen(true)}
-                className="md:hidden p-1 rounded-lg text-gray-500 hover:bg-gray-100"
+                onClick={() => {
+                  setSelectedUser(null);
+                  setSidebarOpen(true);
+                }}
+                className="md:hidden -ml-1 p-2 rounded-lg text-gray-600 hover:bg-gray-100 active:bg-gray-200"
+                aria-label="Back"
               >
-                <MessageCircle className="h-5 w-5" />
+                <ArrowLeft className="h-5 w-5" />
               </button>
               <Avatar className="h-10 w-10">
                 <AvatarFallback
@@ -933,7 +946,7 @@ export default function Chat() {
               onDelete={handleDelete}
             />
 
-            <div className="bg-[#e8ebf0] px-2 py-[5px] md:px-[10px]">
+            <div className="bg-[#e8ebf0] px-2 py-[5px] md:px-[10px] pb-[max(5px,env(safe-area-inset-bottom))] sticky bottom-0">
               {replyTo && (
                 <div className="mb-[5px]">
                   <div className="flex items-center gap-2 px-3 py-[6px] rounded-xl bg-white/80 border-l-[3px] border-[#3390ec]">
@@ -1039,9 +1052,10 @@ export default function Chat() {
           <div className="flex-1 flex items-center justify-center bg-gray-50">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="md:hidden absolute top-4 left-4 p-2 rounded-lg text-gray-500 hover:bg-gray-100"
+              className="md:hidden absolute top-4 left-4 p-2 rounded-lg text-gray-600 bg-white shadow hover:bg-gray-100"
+              aria-label="Open menu"
             >
-              <MessageCircle className="h-5 w-5" />
+              <Menu className="h-5 w-5" />
             </button>
             <div className="text-center">
               <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-[#1E90FF]/10 to-[#22C55E]/10 flex items-center justify-center mx-auto mb-4">

@@ -729,18 +729,16 @@ export default function Chat() {
 
   return (
     <div className="flex h-[100dvh] bg-white overflow-hidden">
-      {/* Mobile backdrop */}
-      {sidebarOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-30 bg-black/40 animate-fade-in"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-      {/* Sidebar — slide-over drawer on mobile, static on desktop */}
+      {/* Sidebar — full-width chat list on mobile (Telegram style), static on desktop.
+          On mobile it's hidden when a chat is open, so only one pane shows at a time. */}
       <div
-        className={`fixed md:static z-40 inset-y-0 left-0 w-[85%] max-w-[20rem] md:w-80 md:max-w-none flex-shrink-0 border-r border-gray-200 bg-white flex flex-col transition-transform duration-200 ease-out md:translate-x-0 ${
-          sidebarOpen ? "translate-x-0 shadow-2xl md:shadow-none" : "-translate-x-full"
-        }`}
+        className={`${
+          isMobile
+            ? selectedUser
+              ? "hidden"
+              : "flex w-full"
+            : "flex w-80 flex-shrink-0"
+        } border-r border-gray-200 bg-white flex-col`}
       >
         <div className="h-16 px-4 flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-[#1E90FF] to-[#22C55E]">
           <div className="flex items-center gap-2">
@@ -885,9 +883,11 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* Chat Area */}
+      {/* Chat Area — hidden on mobile when no chat is selected (sidebar is shown instead) */}
       <div
-        className="flex-1 flex flex-col min-w-0 relative"
+        className={`${
+          isMobile && !selectedUser ? "hidden" : "flex"
+        } flex-1 flex-col min-w-0 relative`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}

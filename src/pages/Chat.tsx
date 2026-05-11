@@ -908,7 +908,6 @@ export default function Chat() {
               <button
                 onClick={() => {
                   setSelectedUser(null);
-                  setSidebarOpen(true);
                 }}
                 className="md:hidden -ml-1 p-2 rounded-lg text-gray-600 hover:bg-gray-100 active:bg-gray-200"
                 aria-label="Back"
@@ -1052,13 +1051,6 @@ export default function Chat() {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gray-50">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="md:hidden absolute top-4 left-4 p-2 rounded-lg text-gray-600 bg-white shadow hover:bg-gray-100"
-              aria-label="Open menu"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
             <div className="text-center">
               <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-[#1E90FF]/10 to-[#22C55E]/10 flex items-center justify-center mx-auto mb-4">
                 <img src={logo} alt="WH-Chat" className="h-12 w-12 rounded-xl object-contain" />

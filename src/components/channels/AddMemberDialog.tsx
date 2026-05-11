@@ -19,7 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { addUserToChannel } from "@/lib/channelMembersApi";
 import { fetchChatUsers, type ChatUserLite } from "@/lib/chatUsersApi";
-import { cn } from "@/lib/utils";
+import { cn, toProperCase } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -212,7 +212,7 @@ export default function AddMemberDialog({
                           </AvatarFallback>
                         </Avatar>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">{u.username}</p>
+                          <p className="text-sm font-medium truncate">{toProperCase(u.username)}</p>
                           <p className="text-xs text-muted-foreground truncate">
                             ID: {String(u.id)}
                             {u.user_code ? ` · ${u.user_code}` : ""}

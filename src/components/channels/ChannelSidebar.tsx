@@ -158,7 +158,7 @@ export default function ChannelSidebar({
   };
 
   return (
-    <aside className="w-80 border-r bg-card flex flex-col">
+    <aside className="w-full md:w-80 md:border-r bg-card flex flex-col h-[100dvh] md:h-auto">
       <div className="px-4 py-3 border-b flex items-center gap-2">
         <Button
           variant="ghost"

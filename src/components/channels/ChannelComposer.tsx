@@ -41,7 +41,7 @@ export default function ChannelComposer({ canPost, currentUserId, onSend, focusK
   // Non-admin: read-only composer with clear messaging.
   if (!canPost) {
     return (
-      <div className="border-t bg-card">
+      <div className="border-t bg-card pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-center justify-center gap-2 px-4 py-2 text-xs text-muted-foreground bg-muted/40">
           <Lock className="h-3.5 w-3.5" />
           <span>Only admin can post in this channel</span>
@@ -118,7 +118,7 @@ export default function ChannelComposer({ canPost, currentUserId, onSend, focusK
   const previewKind = previewFile ? kindFromMime(previewFile.type) : null;
 
   return (
-    <div className="border-t bg-card">
+    <div className="border-t bg-card pb-[env(safe-area-inset-bottom)]">
       {previewFile && (
         <div className="px-4 pt-3">
           <div className="flex items-center gap-3 bg-muted rounded-lg p-2 pr-3">

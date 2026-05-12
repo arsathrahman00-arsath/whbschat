@@ -5,6 +5,8 @@ import { PasswordField } from "@/components/PasswordField";
 import { ResponseBanner } from "@/components/ResponseBanner";
 import { ForgotPassword } from "@/components/ForgotPassword";
 import { Loader2 } from "lucide-react";
+import { getDeviceToken } from "@/lib/firebase";
+import { getDeviceMetadata } from "@/lib/device";
 import logo from "@/assets/logo.jpg";
 
 export default function Login() {
@@ -30,10 +32,24 @@ export default function Login() {
 
     setLoading(true);
     try {
+      // Fetch device token + metadata in parallel with login submission prep.
+      // Failures here must NOT block login.
+      const [device_token, device] = await Promise.all([
+        getDeviceToken().catch(() => ""),
+        Promise.resolve(getDeviceMetadata()),
+      ]);
+
       const loginRes = await fetch("https://ngrchatbot.whindia.in/chat/user_login/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password_hash: password }),
+        body: JSON.stringify({
+          username,
+          password_hash: password,
+          device_token,
+          device_type: device.device_type,
+          os_version: device.os_version,
+          app_version: device.app_version,
+        }),
       });
 
       const loginData = await loginRes.json();
@@ -51,11 +67,6 @@ export default function Login() {
         username: loginData.username || username,
       };
       sessionStorage.setItem("whchat_session", JSON.stringify(session));
-
-      // Request notification permission after successful login
-      if ("Notification" in window && Notification.permission !== "granted") {
-        Notification.requestPermission();
-      }
 
       navigate("/chat");
     } catch (err: any) {

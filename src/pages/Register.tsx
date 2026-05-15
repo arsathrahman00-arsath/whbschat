@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/FormField";
 import { PasswordField } from "@/components/PasswordField";
@@ -13,6 +13,7 @@ import logo from "@/assets/logo.jpg";
 interface FormData {
   email: string;
   password: string;
+  confirm_password: string;
   username: string;
   display_name: string;
   bio: string;
@@ -25,6 +26,7 @@ interface FormData {
 const initial: FormData = {
   email: "",
   password: "",
+  confirm_password: "",
   username: "",
   display_name: "",
   bio: "",
@@ -41,16 +43,24 @@ function validate(data: FormData): Errors {
   if (!data.email.trim()) e.email = "Email is required";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = "Invalid email";
   if (!data.password) e.password = "Password is required";
-  else if (data.password.length < 6) e.password = "Min 6 characters";
+  else if (data.password.length < 8) e.password = "Min 8 characters";
+  else if (!/[A-Z]/.test(data.password)) e.password = "Must include an uppercase letter";
+  else if (!/[0-9]/.test(data.password)) e.password = "Must include a number";
+  else if (!/[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/~`';]/.test(data.password))
+    e.password = "Must include a special character";
+  if (!data.confirm_password) e.confirm_password = "Please confirm your password";
+  else if (data.confirm_password !== data.password) e.confirm_password = "Passwords do not match";
   if (!data.username.trim()) e.username = "Username is required";
   if (!data.display_name.trim()) e.display_name = "Display name is required";
-  if (data.phone && !/^\+?[\d\s-]{7,15}$/.test(data.phone)) e.phone = "Invalid phone number";
+  if (!data.phone.trim()) e.phone = "Phone number is required";
+  else if (!/^\+?[\d\s-]{7,15}$/.test(data.phone)) e.phone = "Invalid phone number";
   if (data.email.length > 255) e.email = "Email too long";
   if (data.username.length > 100) e.username = "Username too long";
   return e;
 }
 
 export default function Register() {
+  const navigate = useNavigate();
   const [form, setForm] = useState<FormData>(initial);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [errors, setErrors] = useState<Errors>({});
@@ -78,7 +88,10 @@ export default function Register() {
       const device = getDeviceMetadata();
 
       const formData = new FormData();
-      Object.entries(form).forEach(([k, val]) => formData.append(k, val));
+      Object.entries(form).forEach(([k, val]) => {
+        if (k === "confirm_password") return;
+        formData.append(k, val);
+      });
       if (profilePhoto) formData.append("profile_photo", profilePhoto);
       formData.append("device_token", device_token);
       formData.append("device_type", device.device_type);
@@ -95,6 +108,9 @@ export default function Register() {
         message: data.message || data.detail || JSON.stringify(data),
         type: res.ok ? "success" : "error",
       });
+      if (res.ok) {
+        setTimeout(() => navigate("/login"), 1200);
+      }
     } catch (err: any) {
       setResponse({ message: err.message || "Network error", type: "error" });
     } finally {
@@ -124,8 +140,12 @@ export default function Register() {
               <FormField label="Username" name="username" placeholder="johndoe" value={form.username} onChange={onChange} error={errors.username} required />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <PasswordField label="Password" name="password" placeholder="Min 6 characters" value={form.password} onChange={onChange} error={errors.password} required autoComplete="new-password" />
+              <PasswordField label="Password" name="password" placeholder="Min 8 chars, 1 upper, 1 number, 1 special" value={form.password} onChange={onChange} error={errors.password} required autoComplete="new-password" />
+              <PasswordField label="Confirm Password" name="confirm_password" placeholder="Re-enter your password" value={form.confirm_password} onChange={onChange} error={errors.confirm_password} required autoComplete="new-password" />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <FormField label="Display Name" name="display_name" placeholder="John Doe" value={form.display_name} onChange={onChange} error={errors.display_name} required />
+              <FormField label="Phone" name="phone" type="tel" placeholder="+1 234 567 8900" value={form.phone} onChange={onChange} error={errors.phone} required />
             </div>
           </fieldset>
 
@@ -137,7 +157,6 @@ export default function Register() {
               <FormField label="Department" name="department" placeholder="Engineering" value={form.department} onChange={onChange} />
               <FormField label="Designation" name="designation" placeholder="Software Engineer" value={form.designation} onChange={onChange} />
             </div>
-            <FormField label="Phone" name="phone" type="tel" placeholder="+1 234 567 8900" value={form.phone} onChange={onChange} error={errors.phone} />
           </fieldset>
 
           {/* Profile */}

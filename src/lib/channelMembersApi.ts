@@ -4,9 +4,10 @@
 
 import { CHANNEL_ENDPOINTS } from "./channelConfig";
 import type { ChannelMember, ChannelMemberRole } from "./channelTypes";
+import { apiFetch } from "./auth";
 
 async function postJson<T = unknown>(url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, {
+  const res = await apiFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -40,7 +41,7 @@ export function mapToChannelMember(raw: any): ChannelMember {
 export async function fetchChannelMembers(
   channelId: string | number,
 ): Promise<ChannelMember[]> {
-  const res = await fetch(`${CHANNEL_ENDPOINTS.members}?channel_id=${channelId}`);
+  const res = await apiFetch(`${CHANNEL_ENDPOINTS.members}?channel_id=${channelId}`);
   const json = await res.json();
   if (!res.ok) {
     throw new Error(json?.message || json?.error || `Failed (${res.status})`);

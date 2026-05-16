@@ -91,7 +91,7 @@ export default function ChatMessages({
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/chat/get_chat_messages/?chat_id=${chatId}&user_id=${currentUserId}`);
+        const res = await apiFetch(`${API_BASE}/chat/get_chat_messages/?chat_id=${chatId}&user_id=${currentUserId}`);
         const data = await res.json();
         const msgs = Array.isArray(data) ? data : data.data || data.messages || data.results || [];
         if (cancelled) return;

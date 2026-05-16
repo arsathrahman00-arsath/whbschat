@@ -6,6 +6,7 @@ import Attachment from "@/components/Attachment";
 import { mapToChatMessage, type ChatMessage } from "@/lib/chatMessage";
 import HtmlMessage, { looksLikeHtml } from "@/components/HtmlMessage";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/auth";
 
 interface ChatMessagesProps {
   chatId: string | number | null;
@@ -91,7 +92,7 @@ export default function ChatMessages({
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/chat/get_chat_messages/?chat_id=${chatId}&user_id=${currentUserId}`);
+        const res = await apiFetch(`${API_BASE}/chat/get_chat_messages/?chat_id=${chatId}&user_id=${currentUserId}`);
         const data = await res.json();
         const msgs = Array.isArray(data) ? data : data.data || data.messages || data.results || [];
         if (cancelled) return;

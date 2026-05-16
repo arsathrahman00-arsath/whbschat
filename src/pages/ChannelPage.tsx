@@ -30,12 +30,15 @@ import { mapToChannel, mapToChannelPost } from "@/lib/channelMappers";
 import { addUserToChannel, joinChannel } from "@/lib/channelMembersApi";
 import type { Channel, ChannelPost } from "@/lib/channelTypes";
 import type { ChatAttachment } from "@/lib/chatMessage";
+import { apiFetch, getStoredUser } from "@/lib/auth";
 import channelImage from "@/assets/channel.jpg";
 import channelIcon from "@/assets/channel-icon.jpg";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 function readSession() {
   try {
+    const local = getStoredUser<any>();
+    if (local) return { userId: local.id, username: local.username };
     return JSON.parse(sessionStorage.getItem("whchat_session") || "null");
   } catch {
     return null;
@@ -102,7 +105,7 @@ export default function ChannelPage() {
     if (!currentUserId) return;
     setLoadingChannels(true);
     try {
-      const res = await fetch(`${CHANNEL_ENDPOINTS.list}?user_id=${currentUserId}`);
+      const res = await apiFetch(`${CHANNEL_ENDPOINTS.list}?user_id=${currentUserId}`);
       const json = await res.json();
       const arr = Array.isArray(json) ? json : json.data || json.channels || [];
       setChannels(sortChannels(arr.map((c: any) => mapToChannel(c, currentUserId))));
@@ -121,7 +124,7 @@ export default function ChannelPage() {
   const loadPosts = useCallback(async (channelId: string | number) => {
     setLoadingPosts(true);
     try {
-      const res = await fetch(`${CHANNEL_ENDPOINTS.posts}?channel_id=${channelId}`);
+      const res = await apiFetch(`${CHANNEL_ENDPOINTS.posts}?channel_id=${channelId}`);
       const json = await res.json();
       const arr = Array.isArray(json) ? json : json.data || json.posts || [];
       const mapped = arr.map((p: any) => mapToChannelPost(p, channelId));
@@ -429,7 +432,7 @@ export default function ChannelPage() {
         }
       }
       // HTTP fallback
-      fetch(CHANNEL_ENDPOINTS.markChannelRead, {
+      apiFetch(CHANNEL_ENDPOINTS.markChannelRead, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ channel_id: channelId, user_id: currentUserId }),
@@ -462,7 +465,7 @@ export default function ChannelPage() {
   ) => {
     if (!currentUserId) return;
     try {
-      const res = await fetch(CHANNEL_ENDPOINTS.create, {
+      const res = await apiFetch(CHANNEL_ENDPOINTS.create, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -609,7 +612,7 @@ export default function ChannelPage() {
     setApproving(true);
     try {
       // Re-fetch channels to get the latest authoritative channel_id, per spec.
-      const listRes = await fetch(`${CHANNEL_ENDPOINTS.list}?user_id=${currentUserId}`);
+      const listRes = await apiFetch(`${CHANNEL_ENDPOINTS.list}?user_id=${currentUserId}`);
       const listJson = await listRes.json();
       const arr = Array.isArray(listJson) ? listJson : listJson.data || listJson.channels || [];
       const match = arr.find((c: any) => String(c.id) === String(selected.id));
@@ -618,7 +621,7 @@ export default function ChannelPage() {
       const payload: Record<string, unknown> = { channel_id };
       if (code) payload.code = code;
 
-      const res = await fetch(CHANNEL_ENDPOINTS.approveCleanData, {
+      const res = await apiFetch(CHANNEL_ENDPOINTS.approveCleanData, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -646,7 +649,7 @@ export default function ChannelPage() {
     if (!selected || rejecting) return;
     setRejecting(true);
     try {
-      const listRes = await fetch(`${CHANNEL_ENDPOINTS.list}?user_id=${currentUserId}`);
+      const listRes = await apiFetch(`${CHANNEL_ENDPOINTS.list}?user_id=${currentUserId}`);
       const listJson = await listRes.json();
       const arr = Array.isArray(listJson) ? listJson : listJson.data || listJson.channels || [];
       const match = arr.find((c: any) => String(c.id) === String(selected.id));
@@ -655,7 +658,7 @@ export default function ChannelPage() {
       const payload: Record<string, unknown> = { channel_id };
       if (code) payload.code = code;
 
-      const res = await fetch(CHANNEL_ENDPOINTS.rejectCleanData, {
+      const res = await apiFetch(CHANNEL_ENDPOINTS.rejectCleanData, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

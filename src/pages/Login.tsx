@@ -7,6 +7,7 @@ import { ForgotPassword } from "@/components/ForgotPassword";
 import { Loader2 } from "lucide-react";
 import { getDeviceToken } from "@/lib/firebase";
 import { getDeviceMetadata } from "@/lib/device";
+import { setToken, setStoredUser } from "@/lib/auth";
 import logo from "@/assets/logo.jpg";
 
 export default function Login() {
@@ -67,6 +68,20 @@ export default function Login() {
         username: loginData.username || username,
       };
       sessionStorage.setItem("whchat_session", JSON.stringify(session));
+
+      // Persist JWT + user object in localStorage for the API client.
+      const token =
+        loginData.token ||
+        loginData.access_token ||
+        loginData.access ||
+        loginData.jwt ||
+        "";
+      if (token) setToken(String(token));
+      setStoredUser({
+        id: loginData.id,
+        username: loginData.username || username,
+        ...loginData,
+      });
 
       navigate("/chat");
     } catch (err: any) {

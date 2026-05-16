@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Play, FileText, Download, X, AlertCircle, Loader2 } from "lucide-react";
 import { formatFileSize, type ChatAttachment } from "@/lib/chatMessage";
+import { useAuthedMedia, downloadAuthedFile } from "@/lib/useAuthedMedia";
 
 interface AttachmentProps {
   file: ChatAttachment;
@@ -12,6 +13,24 @@ interface AttachmentProps {
 export default function Attachment({ file, isMe, uploading, uploadError }: AttachmentProps) {
   const [lightbox, setLightbox] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
+  // Preview fetch (image thumb / video poster) — only for media types.
+  const previewUrl =
+    file.message_type === "image" || file.message_type === "video" ? file.url : "";
+  const { objectUrl: mediaObjectUrl, state: mediaState } = useAuthedMedia(previewUrl);
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!file.url) return;
+    try {
+      await downloadAuthedFile(file.url, file.name || "file");
+    } catch {
+      /* swallow — UI shows nothing extra */
+    }
+  };
+
+  const isLoadingMedia = mediaState === "loading" && !uploading && !uploadError;
+  const isUnauthorized = mediaState === "unauthorized";
 
   const stateOverlay = (uploading || uploadError) && (
     <div className="absolute inset-0 bg-black/45 flex items-center justify-center rounded-[14px]">
@@ -25,37 +44,47 @@ export default function Attachment({ file, isMe, uploading, uploadError }: Attac
     </div>
   );
 
+  const fetchOverlay = !uploading && !uploadError && (isLoadingMedia || isUnauthorized) && (
+    <div className="absolute inset-0 bg-black/45 flex items-center justify-center rounded-[14px]">
+      {isUnauthorized ? (
+        <div className="flex items-center gap-1 text-white text-xs font-medium">
+          <AlertCircle className="h-4 w-4" /> Unauthorized
+        </div>
+      ) : (
+        <Loader2 className="h-6 w-6 text-white animate-spin" />
+      )}
+    </div>
+  );
+
   if (file.message_type === "image") {
     return (
       <>
         <div className="relative max-w-[260px] animate-fade-in group">
-          {file.url ? (
+          {mediaObjectUrl ? (
             <img
-              src={file.url}
+              src={mediaObjectUrl}
               alt={file.name}
               loading="lazy"
-              onClick={() => !uploading && !uploadError && setLightbox(true)}
+              onClick={() => !uploading && !uploadError && mediaState === "ready" && setLightbox(true)}
               className="rounded-[14px] w-full h-auto cursor-pointer object-cover transition-opacity"
             />
           ) : (
             <div className="rounded-[14px] w-[220px] h-[160px] bg-black/10 animate-pulse" />
           )}
-          {!uploading && !uploadError && file.url && (
-            <a
-              href={file.url}
-              download={file.name}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+          {!uploading && !uploadError && mediaState === "ready" && (
+            <button
+              type="button"
+              onClick={handleDownload}
               className="absolute top-2 right-2 p-1.5 rounded-full bg-black/55 text-white hover:bg-black/75 transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100"
               aria-label="Download image"
             >
               <Download className="h-4 w-4" />
-            </a>
+            </button>
           )}
           {stateOverlay}
+          {fetchOverlay}
         </div>
-        {lightbox && file.url && (
+        {lightbox && mediaObjectUrl && (
           <div
             className="fixed inset-0 z-[10001] bg-black/90 flex items-center justify-center p-4"
             onClick={() => setLightbox(false)}
@@ -68,7 +97,7 @@ export default function Attachment({ file, isMe, uploading, uploadError }: Attac
               <X className="h-5 w-5" />
             </button>
             <img
-              src={file.url}
+              src={mediaObjectUrl}
               alt={file.name}
               className="max-w-full max-h-full rounded-lg"
               onClick={(e) => e.stopPropagation()}
@@ -84,15 +113,15 @@ export default function Attachment({ file, isMe, uploading, uploadError }: Attac
       <>
         <div className="relative max-w-[260px] animate-fade-in group">
           <div
-            onClick={() => !uploading && !uploadError && file.url && setVideoOpen(true)}
+            onClick={() => !uploading && !uploadError && mediaObjectUrl && setVideoOpen(true)}
             className="relative rounded-[14px] overflow-hidden bg-black cursor-pointer aspect-video"
           >
-            {file.url ? (
-              <video src={file.url} preload="metadata" muted className="w-full h-full object-cover" />
+            {mediaObjectUrl ? (
+              <video src={mediaObjectUrl} preload="metadata" muted className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full bg-black/20 animate-pulse" />
             )}
-            {!uploading && !uploadError && (
+            {!uploading && !uploadError && mediaState === "ready" && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="h-12 w-12 rounded-full bg-black/60 flex items-center justify-center">
                   <Play className="h-6 w-6 text-white fill-white ml-0.5" />
@@ -100,22 +129,20 @@ export default function Attachment({ file, isMe, uploading, uploadError }: Attac
               </div>
             )}
           </div>
-          {!uploading && !uploadError && file.url && (
-            <a
-              href={file.url}
-              download={file.name}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+          {!uploading && !uploadError && mediaState === "ready" && (
+            <button
+              type="button"
+              onClick={handleDownload}
               className="absolute top-2 right-2 p-1.5 rounded-full bg-black/55 text-white hover:bg-black/75 transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100 z-10"
               aria-label="Download video"
             >
               <Download className="h-4 w-4" />
-            </a>
+            </button>
           )}
           {stateOverlay}
+          {fetchOverlay}
         </div>
-        {videoOpen && file.url && (
+        {videoOpen && mediaObjectUrl && (
           <div
             className="fixed inset-0 z-[10001] bg-black/90 flex items-center justify-center p-4"
             onClick={() => setVideoOpen(false)}
@@ -128,7 +155,7 @@ export default function Attachment({ file, isMe, uploading, uploadError }: Attac
               <X className="h-5 w-5" />
             </button>
             <video
-              src={file.url}
+              src={mediaObjectUrl}
               controls
               autoPlay
               className="max-w-full max-h-full rounded-lg"
@@ -166,19 +193,16 @@ export default function Attachment({ file, isMe, uploading, uploadError }: Attac
           </p>
         </div>
         {!uploading && !uploadError && file.url && (
-          <a
-            href={file.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            download={file.name}
-            onClick={(e) => e.stopPropagation()}
+          <button
+            type="button"
+            onClick={handleDownload}
             className={`p-2 rounded-full flex-shrink-0 ${
               isMe ? "text-white hover:bg-white/10" : "text-[#3390ec] hover:bg-[#3390ec]/10"
             }`}
             aria-label="Download"
           >
             <Download className="h-4 w-4" />
-          </a>
+          </button>
         )}
       </div>
     </div>

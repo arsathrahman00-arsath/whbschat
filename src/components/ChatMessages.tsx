@@ -6,6 +6,7 @@ import Attachment from "@/components/Attachment";
 import { mapToChatMessage, type ChatMessage } from "@/lib/chatMessage";
 import HtmlMessage, { looksLikeHtml } from "@/components/HtmlMessage";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/auth";
 
 interface ChatMessagesProps {
   chatId: string | number | null;

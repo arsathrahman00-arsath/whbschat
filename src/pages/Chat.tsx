@@ -20,6 +20,7 @@ import { uploadAttachment } from "@/lib/uploadAttachment";
 import { sendChatMessage } from "@/lib/wsSend";
 import { toast } from "sonner";
 import { toProperCase } from "@/lib/utils";
+import { apiFetch, clearAuth, getStoredUser } from "@/lib/auth";
 
 interface ChatUser {
   id: number | string;
@@ -152,6 +153,8 @@ export default function Chat() {
 
   const session = (() => {
     try {
+      const local = getStoredUser<any>();
+      if (local) return { userId: local.id, username: local.username };
       return JSON.parse(sessionStorage.getItem("whchat_session") || "null");
     } catch {
       return null;
@@ -477,7 +480,7 @@ export default function Chat() {
   const fetchUsers = async () => {
     setLoadingUsers(true);
     try {
-      const res = await fetch("https://ngrchatbot.whindia.in/chat/get_users/");
+      const res = await apiFetch("https://ngrchatbot.whindia.in/chat/get_users/");
       const data = await res.json();
       const rawList = Array.isArray(data) ? data : data.data || data.users || data.results || [];
       let userList: ChatUser[] = rawList.map((u: any) => ({
@@ -710,7 +713,7 @@ export default function Chat() {
 
   const handleLogout = () => {
     if (wsRef.current) wsRef.current.close();
-    sessionStorage.removeItem("whchat_session");
+    clearAuth();
     navigate("/login");
   };
 

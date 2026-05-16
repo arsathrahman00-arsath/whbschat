@@ -30,12 +30,15 @@ import { mapToChannel, mapToChannelPost } from "@/lib/channelMappers";
 import { addUserToChannel, joinChannel } from "@/lib/channelMembersApi";
 import type { Channel, ChannelPost } from "@/lib/channelTypes";
 import type { ChatAttachment } from "@/lib/chatMessage";
+import { apiFetch, getStoredUser } from "@/lib/auth";
 import channelImage from "@/assets/channel.jpg";
 import channelIcon from "@/assets/channel-icon.jpg";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 function readSession() {
   try {
+    const local = getStoredUser<any>();
+    if (local) return { userId: local.id, username: local.username };
     return JSON.parse(sessionStorage.getItem("whchat_session") || "null");
   } catch {
     return null;

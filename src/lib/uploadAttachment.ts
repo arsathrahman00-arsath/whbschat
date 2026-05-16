@@ -5,8 +5,10 @@
 // ChatAttachment ready to be embedded in a ChatMessage.
 
 import { resolveFileUrl, kindFromMime, type AttachmentKind, type ChatAttachment } from "./chatMessage";
+import { getToken } from "./auth";
+import { API_ENDPOINTS } from "./apiConfig";
 
-const UPLOAD_URL = "https://ngrchatbot.whindia.in/chat/upload_file/";
+const UPLOAD_URL = API_ENDPOINTS.uploadFile;
 
 export interface UploadOptions {
   onProgress?: (percent: number) => void;
@@ -25,6 +27,23 @@ export function uploadAttachment(
     form.append("sender_id", String(currentUserId));
 
     xhr.open("POST", UPLOAD_URL);
+    const token = getToken();
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState === 4 && xhr.status === 401) {
+        // Token expired — clear and bounce to login.
+        try {
+          localStorage.removeItem("chat_token");
+          localStorage.removeItem("chat_user");
+        } catch {
+          /* ignore */
+        }
+        if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+          window.location.replace("/login");
+        }
+      }
+    };
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && opts.onProgress) {

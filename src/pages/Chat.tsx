@@ -312,7 +312,6 @@ export default function Chat() {
         const data = JSON.parse(event.data);
         // Debug: surface every WS frame so we can see what the backend sends.
         // eslint-disable-next-line no-console
-        console.log("[WS] received", data);
 
         if (data.type === "user_status") {
           setUserStatuses((prev) => ({
@@ -345,7 +344,6 @@ export default function Chat() {
         }
 
         if (data.type === "message_deleted") {
-          console.log("Delete event received", data);
           const deleteType: "me" | "everyone" = data.delete_type === "me" ? "me" : "everyone";
           applyDeletedMessage(data.message_id, deleteType);
           return;
@@ -361,7 +359,6 @@ export default function Chat() {
           (data.sender_id != null && (data.message != null || data.file != null || data.file_id != null));
 
         if (!looksLikeChatMessage) {
-          console.log("[WS] ignored frame (unknown type)", data.type);
           return;
         }
 
@@ -372,7 +369,6 @@ export default function Chat() {
         const peerKey = isFromMe ? receiverId : senderId;
 
         const incoming = mapToChatMessage(data, currentUserId);
-        console.log("[WS] chat_message", { isFromMe, peerKey, incoming });
 
         const previewText = previewFromMessage(incoming.message, incoming.file?.name);
         const ts = new Date(incoming.created_at).getTime() || Date.now();
